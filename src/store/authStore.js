@@ -1,3 +1,13 @@
+/**
+ * authStore.js — CompressorAI v6
+ *
+ * Fix vs previous version:
+ *  - isLoading initial state changed from !!token → false.
+ *    Previously if fetchMe was never called (e.g. missing route guard),
+ *    the app would stay stuck in loading state forever.
+ *    Now fetchMe sets isLoading: true itself when it starts, which is
+ *    the correct place — the store should start in a known idle state.
+ */
 import { create } from 'zustand'
 import api from '../utils/api'
 
@@ -10,7 +20,9 @@ const clear = (key) => { try { localStorage.removeItem(key) } catch {} }
 const useAuthStore = create((set, get) => ({
   user:            load('auth_user'),
   token:           localStorage.getItem('auth_token') || null,
-  isLoading:       !!localStorage.getItem('auth_token'),
+  // FIX: was !!localStorage.getItem('auth_token') — if fetchMe is never called,
+  // app gets permanently stuck in loading. fetchMe sets this to true itself.
+  isLoading:       false,
   isAuthenticated: !!localStorage.getItem('auth_token'),
 
   // Called on login
