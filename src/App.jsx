@@ -12,7 +12,8 @@ import Analysis       from './pages/Analysis'
 import Settings       from './pages/Settings'
 import Tutorial       from './pages/Tutorial'
 import AdminPanel     from './pages/AdminPanel'
-import ReportsHistory from './pages/ReportsHistory'   // ← NEW
+import ReportsHistory from './pages/ReportsHistory'
+import Maintenance    from './pages/Maintenance'
 import Layout         from './components/ui/Layout'
 
 // ── Route Guards ──────────────────────────────────────────────
@@ -32,11 +33,10 @@ function AppWithLayout({ children }) {
 
 // ── App ───────────────────────────────────────────────────────
 export default function App() {
-  const { fetchMe, isAuthenticated, isLoading, checkAuth } = useAuthStore()
+  const { fetchMe, isAuthenticated, isLoading } = useAuthStore()
 
   useEffect(() => {
-    checkAuth()
-    if (isAuthenticated) fetchMe()
+    fetchMe()
   }, []) // eslint-disable-line
 
   if (isLoading) return (
@@ -95,9 +95,13 @@ export default function App() {
           <PrivateRoute><AppWithLayout><AdminPanel /></AppWithLayout></PrivateRoute>
         }/>
 
-        {/* ── NEW: Reports History ── */}
         <Route path="/reports" element={
           <PrivateRoute><AppWithLayout><ReportsHistory /></AppWithLayout></PrivateRoute>
+        }/>
+
+        {/* ── Maintenance / PM Compliance ── */}
+        <Route path="/maintenance" element={
+          <PrivateRoute><AppWithLayout><Maintenance /></AppWithLayout></PrivateRoute>
         }/>
 
         {/* ── Fallback ── */}

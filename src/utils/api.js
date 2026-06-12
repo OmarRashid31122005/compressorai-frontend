@@ -1,7 +1,16 @@
 import axios from "axios"
 
-// Backend URL (Replit deployment)
-const API_BASE_URL = "https://compressorai-backend--FYP2026.replit.app"
+// ── Backend URL ───────────────────────────────────────────────
+// Local development  → http://localhost:8000
+// Production (Replit) → https://compressorai-backend--fyp2026.replit.app
+//
+// Auto-detect: if running on localhost, use local backend
+const IS_LOCAL = window.location.hostname === "localhost" ||
+                 window.location.hostname === "127.0.0.1"
+
+const API_BASE_URL = IS_LOCAL
+  ? "http://localhost:8000"
+  : "https://compressorai-backend--fyp2026.replit.app"
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -20,8 +29,8 @@ api.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`
     }
 
-    // ✅ ADD: When sending a file, delete Content-Type so the
-    // browser can set the correct multipart/form-data boundary
+    // When sending a file, delete Content-Type so the
+    // browser sets the correct multipart/form-data boundary
     if (config.data instanceof FormData) {
       delete config.headers["Content-Type"]
     }

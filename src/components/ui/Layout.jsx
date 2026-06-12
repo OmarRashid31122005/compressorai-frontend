@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard, BarChart3, BookOpen, Settings,
   LogOut, Zap, ChevronRight, Shield,
-  Wrench, Clock, X, Menu, FileText
+  Wrench, X, Menu, FileText
 } from 'lucide-react'
 import useAuthStore from '../../store/authStore'
 import toast from 'react-hot-toast'
@@ -12,94 +12,6 @@ import toast from 'react-hot-toast'
 const roleColors = {
   admin:    { bg:'bg-cyan-400/15',  text:'text-cyan-400',  border:'border-cyan-400/30',  label:'Admin'    },
   engineer: { bg:'bg-blue-400/15', text:'text-blue-400', border:'border-blue-400/30', label:'Engineer' },
-}
-
-const COMING_SOON_PAGES = {
-  maintenance: {
-    icon: Wrench, iconColor: '#f59e0b',
-    badge: 'Coming Soon', badgeColor: 'rgba(245,158,11,0.15)', badgeBorder: 'rgba(245,158,11,0.3)', badgeText: '#f59e0b',
-    title: 'Maintenance Module', subtitle: 'Predictive & Preventive Maintenance Management',
-    message: `We appreciate your curiosity and enthusiasm. The Maintenance Module is currently under active development as part of CompressorAI's next major release.\n\nThis feature will empower engineers and facility managers with predictive maintenance scheduling, fault detection alerts, service history tracking, and AI-driven component lifecycle analysis — all seamlessly integrated within the CompressorAI ecosystem.\n\nWe kindly request your patience as our team works diligently to deliver this functionality with the precision and quality you deserve. Your continued trust and engagement inspire us to build better, faster, and smarter.\n\nThe wait, we assure you, will be well worth it.`,
-    eta: 'Expected in a future release',
-  },
-}
-
-function ComingSoonModal({ pageKey, onClose }) {
-  const page = COMING_SOON_PAGES[pageKey]
-  if (!page) return null
-  const Icon = page.icon
-  return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[60] flex items-center justify-center p-4"
-        style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)' }}
-        onClick={onClose}>
-        <motion.div
-          initial={{ opacity: 0, scale: 0.92, y: 20 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.92, y: 20 }}
-          transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-          onClick={e => e.stopPropagation()}
-          className="w-full max-w-lg relative"
-          style={{
-            background: 'rgba(8,14,26,0.97)',
-            border: '1px solid rgba(255,255,255,0.1)',
-            borderRadius: '20px',
-            boxShadow: '0 40px 80px rgba(0,0,0,0.6)',
-          }}>
-          <div className="absolute top-0 left-8 right-8 h-0.5 rounded-full"
-            style={{ background: `linear-gradient(90deg, transparent, ${page.iconColor}, transparent)` }}/>
-          <button onClick={onClose}
-            className="absolute top-4 right-4 w-8 h-8 rounded-lg flex items-center justify-center transition-all"
-            style={{ background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)' }}>
-            <X size={14} className="text-slate-400"/>
-          </button>
-          <div className="p-6 md:p-8">
-            <div className="flex items-center gap-4 mb-6">
-              <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0"
-                style={{ background: `${page.iconColor}18`, border: `1px solid ${page.iconColor}40` }}>
-                <Icon size={26} style={{ color: page.iconColor }}/>
-              </div>
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-xs font-mono font-600 px-2.5 py-1 rounded-full"
-                    style={{ background: page.badgeColor, border: `1px solid ${page.badgeBorder}`, color: page.badgeText }}>
-                    {page.badge}
-                  </span>
-                </div>
-                <h2 className="font-display font-800 text-white text-lg md:text-xl leading-tight">{page.title}</h2>
-                <p className="text-slate-500 text-xs mt-0.5">{page.subtitle}</p>
-              </div>
-            </div>
-            <div className="h-px mb-5" style={{ background:'rgba(255,255,255,0.06)' }}/>
-            <div className="space-y-3 max-h-48 overflow-y-auto">
-              {page.message.trim().split('\n\n').map((para, i) => (
-                <p key={i} className="text-sm text-slate-400 leading-relaxed"
-                  style={{ fontFamily:'Georgia, serif', lineHeight:'1.75' }}>
-                  {para.trim()}
-                </p>
-              ))}
-            </div>
-            <div className="mt-6 pt-4 flex items-center justify-end"
-              style={{ borderTop:'1px solid rgba(255,255,255,0.06)' }}>
-              <motion.button
-                whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
-                onClick={onClose}
-                className="text-xs font-display font-600 px-4 py-2 rounded-xl transition-all"
-                style={{
-                  background: `${page.iconColor}18`,
-                  border: `1px solid ${page.iconColor}40`,
-                  color: page.iconColor,
-                }}>
-                Understood, Thank You
-              </motion.button>
-            </div>
-          </div>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
-  )
 }
 
 // ── Nav Item ──────────────────────────────────────────────────
@@ -172,35 +84,20 @@ function AnalysisNavButton({ collapsed, onClick }) {
 }
 
 // ── Nav Items list (shared between sidebar & mobile drawer) ───
-function NavList({ collapsed = false, onItemClick, hasAdmin, onComingSoon }) {
+function NavList({ collapsed = false, onItemClick, hasAdmin }) {
   return (
     <>
-      <NavItem to="/dashboard" icon={LayoutDashboard} label="Dashboard"  collapsed={collapsed} onClick={onItemClick} />
+      <NavItem to="/dashboard"   icon={LayoutDashboard} label="Dashboard"     collapsed={collapsed} onClick={onItemClick} />
       <div className="mb-0.5">
         <AnalysisNavButton collapsed={collapsed} onClick={onItemClick} />
       </div>
-      <NavItem to="/reports"   icon={FileText}       label="My Reports" collapsed={collapsed} onClick={onItemClick} />
-      <NavItem to="/tutorial"  icon={BookOpen}       label="Tutorial"   collapsed={collapsed} onClick={onItemClick} />
-      <NavItem to="/settings"  icon={Settings}       label="Settings"   collapsed={collapsed} onClick={onItemClick} />
-      <div className="mt-2 pt-2" style={{ borderTop:'1px solid rgba(255,255,255,0.04)' }}>
-        <motion.button whileHover={{ x: collapsed ? 0 : 3 }}
-          onClick={() => { onComingSoon('maintenance'); onItemClick?.() }}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 cursor-pointer mb-0.5 text-slate-500 hover:text-white hover:bg-white/5 border border-transparent">
-          <Wrench size={18} className="flex-shrink-0" />
-          {!collapsed && (
-            <span className="font-display font-600 text-sm whitespace-nowrap flex-1 text-left">Maintenance</span>
-          )}
-          {!collapsed && (
-            <span className="text-[9px] font-mono font-600 px-1.5 py-0.5 rounded-full flex-shrink-0"
-              style={{ background:'rgba(245,158,11,0.15)', color:'#f59e0b', border:'1px solid rgba(245,158,11,0.3)' }}>
-              Soon
-            </span>
-          )}
-        </motion.button>
-      </div>
+      <NavItem to="/maintenance" icon={Wrench}          label="PM Compliance" collapsed={collapsed} onClick={onItemClick} />
+      <NavItem to="/reports"     icon={FileText}        label="My Reports"    collapsed={collapsed} onClick={onItemClick} />
+      <NavItem to="/tutorial"    icon={BookOpen}        label="Tutorial"      collapsed={collapsed} onClick={onItemClick} />
+      <NavItem to="/settings"    icon={Settings}        label="Settings"      collapsed={collapsed} onClick={onItemClick} />
       {hasAdmin && (
         <NavItem to="/admin" icon={Shield} label="Admin Panel" collapsed={collapsed} onClick={onItemClick}
-          extraStyle={{ marginTop:'8px' }} />
+          extraStyle={{ marginTop:'8px', borderTop:'1px solid rgba(255,255,255,0.04)', paddingTop:'10px' }} />
       )}
     </>
   )
@@ -208,9 +105,8 @@ function NavList({ collapsed = false, onItemClick, hasAdmin, onComingSoon }) {
 
 // ── Main Layout ───────────────────────────────────────────────
 export default function Layout({ children }) {
-  const [collapsed,       setCollapsed]      = useState(false)
-  const [mobileOpen,      setMobileOpen]     = useState(false)
-  const [comingSoonModal, setComingSoonModal] = useState(null)
+  const [collapsed,  setCollapsed]  = useState(false)
+  const [mobileOpen, setMobileOpen] = useState(false)
   const { user, logout, hasRole } = useAuthStore()
   const navigate  = useNavigate()
   const location  = useLocation()
@@ -246,7 +142,7 @@ export default function Layout({ children }) {
                 <motion.div initial={{ opacity:0, x:-10 }} animate={{ opacity:1, x:0 }}
                   exit={{ opacity:0, x:-10 }} className="min-w-0">
                   <div className="font-display font-800 text-white text-sm truncate">CompressorAI</div>
-                  <div className="text-yellow-400/50 text-[9px] font-mono tracking-widest">OPTIMIZER v5.0</div>
+                  <div className="text-yellow-400/50 text-[9px] font-mono tracking-widest">OPTIMIZER v6.0</div>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -258,7 +154,6 @@ export default function Layout({ children }) {
           <NavList
             collapsed={collapsed}
             hasAdmin={hasRole(['admin'])}
-            onComingSoon={setComingSoonModal}
           />
         </nav>
 
@@ -341,7 +236,7 @@ export default function Layout({ children }) {
                   </div>
                   <div>
                     <div className="font-display font-800 text-white text-sm">CompressorAI</div>
-                    <div className="text-yellow-400/50 text-[9px] font-mono tracking-widest">OPTIMIZER v5.0</div>
+                    <div className="text-yellow-400/50 text-[9px] font-mono tracking-widest">OPTIMIZER v6.0</div>
                   </div>
                 </div>
                 <button onClick={() => setMobileOpen(false)}
@@ -355,7 +250,6 @@ export default function Layout({ children }) {
                   collapsed={false}
                   onItemClick={() => setMobileOpen(false)}
                   hasAdmin={hasRole(['admin'])}
-                  onComingSoon={(key) => { setComingSoonModal(key); setMobileOpen(false) }}
                 />
               </nav>
 
@@ -423,14 +317,6 @@ export default function Layout({ children }) {
           </div>
         </main>
       </div>
-
-      {/* Coming Soon Modal */}
-      {comingSoonModal && (
-        <ComingSoonModal
-          pageKey={comingSoonModal}
-          onClose={() => setComingSoonModal(null)}
-        />
-      )}
     </div>
   )
 }

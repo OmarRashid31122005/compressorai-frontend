@@ -10,7 +10,7 @@ import toast from 'react-hot-toast'
 import api from '../utils/api'
 import useAuthStore from '../store/authStore'
 
-/* ── KPI Card (unchanged from v4) ──────────────────────── */
+/* ── KPI Card ──────────────────────────────────────────── */
 function KPICard({ label, value, unit, icon: Icon, color = 'cyan', delay = 0 }) {
   const colors = {
     cyan:   { bg:'bg-cyan-400/10',   border:'border-cyan-400/20',   text:'text-cyan-400',   glow:'rgba(0,212,255,0.3)'  },
@@ -37,7 +37,7 @@ function KPICard({ label, value, unit, icon: Icon, color = 'cyan', delay = 0 }) 
   )
 }
 
-/* ── Unit Card (v5 — engineer view) ────────────────────── */
+/* ── Unit Card (engineer view) ─────────────────────────── */
 function UnitCard({ unit, onUnlink, i }) {
   const navigate = useNavigate()
 
@@ -49,16 +49,13 @@ function UnitCard({ unit, onUnlink, i }) {
       style={{ border:'1px solid rgba(255,255,255,0.07)' }}
       onClick={() => navigate(`/analysis/${unit.id}`)}>
 
-      {/* Top accent line */}
       <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-yellow-400/0 via-yellow-400/60 to-yellow-400/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
-      {/* Unlink button */}
       <button onClick={e => { e.stopPropagation(); onUnlink(unit.id) }}
         className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-all p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-400/10">
         <X size={14} />
       </button>
 
-      {/* Header */}
       <div className="flex items-start gap-3 mb-5">
         <div className="w-12 h-12 rounded-xl bg-yellow-400/10 border border-yellow-400/20 flex items-center justify-center flex-shrink-0 group-hover:bg-yellow-400/20 transition-colors">
           <Cpu size={22} className="text-yellow-400" />
@@ -76,7 +73,6 @@ function UnitCard({ unit, onUnlink, i }) {
         }`}>{unit.is_active !== false ? '● Active' : '○ Inactive'}</span>
       </div>
 
-      {/* Info grid */}
       <div className="grid grid-cols-2 gap-2 mb-5">
         {[
           { icon: MapPin,   label:'Location',     value: unit.location },
@@ -94,7 +90,6 @@ function UnitCard({ unit, onUnlink, i }) {
         ))}
       </div>
 
-      {/* Stats row */}
       <div className="flex items-center gap-4 mb-4 px-0.5">
         <div className="flex items-center gap-1.5 text-xs text-slate-500">
           <Database size={11} className="text-slate-600" />
@@ -107,7 +102,6 @@ function UnitCard({ unit, onUnlink, i }) {
         )}
       </div>
 
-      {/* Action buttons — per unit */}
       <div className="grid grid-cols-2 gap-2">
         <button
           onClick={e => { e.stopPropagation(); navigate(`/analysis/${unit.id}`) }}
@@ -133,16 +127,16 @@ function UnitCard({ unit, onUnlink, i }) {
   )
 }
 
-/* ── Admin Type Card (v5 — admin view) ─────────────────── */
+/* ── Admin Type Card (admin view) ──────────────────────── */
 function AdminTypeCard({ type, i }) {
   const navigate = useNavigate()
 
-  // Navigate to the first unit of THIS specific type only
+  // FIX: was /compressors/units?type_id=... (405 error)
+  // Correct endpoint is /compressors/units/search?type_id=...
   const handleOptimize = async (e) => {
     e.stopPropagation()
     try {
-      // Get units filtered by this compressor type
-      const res = await api.get(`/compressors/units?type_id=${type.id}`)
+      const res = await api.get(`/compressors/units/search?type_id=${type.id}`)
       const typeUnits = Array.isArray(res.data)
         ? res.data
         : (res.data?.results ?? res.data?.units ?? [])
@@ -152,7 +146,6 @@ function AdminTypeCard({ type, i }) {
         localStorage.setItem('last_unit_id', match.id)
         navigate(`/analysis/${match.id}`)
       } else {
-        // No units for this type — navigate to dashboard to add one
         toast('No units found for this compressor type. Add a unit first.', {
           icon: '⚠️', style: { background:'#0d1a2e', color:'#e2e8f0' }
         })
@@ -233,9 +226,9 @@ function AdminTypeCard({ type, i }) {
   )
 }
 
-/* ── Add Unit Modal — 2-step (v5) ───────────────────────── */
+/* ── Add Unit Modal — 2-step ────────────────────────────── */
 function AddCompressorModal({ onClose, onAdd }) {
-  const [step, setStep]         = useState('type')   // 'type' | 'unit'
+  const [step, setStep]         = useState('type')
   const [typeSearch, setSearch] = useState('')
   const [typeResults, setTypes] = useState([])
   const [selectedType, setSel]  = useState(null)
@@ -299,7 +292,6 @@ function AddCompressorModal({ onClose, onAdd }) {
           className="w-full max-w-lg rounded-2xl overflow-hidden"
           style={{ background:'rgba(8,14,26,0.98)', border:'1px solid rgba(250,204,21,0.2)', boxShadow:'0 0 60px rgba(250,204,21,0.1)' }}>
 
-          {/* Header */}
           <div className="flex items-center justify-between p-6 border-b border-yellow-400/10">
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-xl bg-yellow-400/10 border border-yellow-400/25 flex items-center justify-center">
@@ -307,7 +299,6 @@ function AddCompressorModal({ onClose, onAdd }) {
               </div>
               <div>
                 <h2 className="font-display font-700 text-white text-lg">Add Compressor Unit</h2>
-                {/* Step indicator */}
                 <div className="flex items-center gap-2 mt-0.5">
                   {['Model', 'Unit Details'].map((s, i) => (
                     <div key={s} className="flex items-center gap-2">
@@ -332,10 +323,8 @@ function AddCompressorModal({ onClose, onAdd }) {
           </div>
 
           <div className="p-6">
-            {/* ── STEP 1: Type ── */}
             {step === 'type' && (
               <div className="space-y-4">
-                {/* Toggle */}
                 <div className="flex gap-2 p-1 rounded-xl" style={{ background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)' }}>
                   {[['existing','Select Existing'],['new','Create New']].map(([k,l]) => (
                     <button key={k} onClick={() => setNew(k==='new')}
@@ -432,10 +421,8 @@ function AddCompressorModal({ onClose, onAdd }) {
               </div>
             )}
 
-            {/* ── STEP 2: Unit ── */}
             {step === 'unit' && (
               <div className="space-y-4">
-                {/* Model badge */}
                 <div className="rounded-xl p-3 flex items-center gap-3"
                   style={{ background:'rgba(250,204,21,0.06)', border:'1px solid rgba(250,204,21,0.15)' }}>
                   <Layers size={16} className="text-yellow-400 flex-shrink-0" />
@@ -501,7 +488,6 @@ export default function Dashboard() {
     setLoading(true)
     try {
       const [main, adminStats] = await Promise.all([
-        // v5: engineers → units/my, admins → types list
         isEngineer ? api.get('/compressors/units/my') : api.get('/compressors/types'),
         isAdmin    ? api.get('/admin/stats').catch(() => ({ data:null })) : Promise.resolve({ data:null }),
       ])
@@ -527,7 +513,6 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8 page-enter">
-      {/* Header */}
       <div className="flex items-start justify-between">
         <motion.div initial={{ opacity:0, x:-20 }} animate={{ opacity:1, x:0 }}>
           <p className="text-slate-500 text-sm font-mono mb-1">{greeting} 👋</p>
@@ -551,41 +536,15 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Admin KPIs — derived from locally fetched types array so values are always accurate */}
       {isAdmin && units.length > 0 && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <KPICard
-            label="Compressor Types"
-            value={units.length}
-            icon={Layers}
-            color="yellow"
-            delay={0}
-          />
-          <KPICard
-            label="Total Units"
-            value={units.reduce((s, t) => s + (t.unit_count ?? 0), 0)}
-            icon={Cpu}
-            color="cyan"
-            delay={0.1}
-          />
-          <KPICard
-            label="Models Trained"
-            value={units.filter(t => t.ml_model).length}
-            icon={Brain}
-            color="green"
-            delay={0.2}
-          />
-          <KPICard
-            label="Active Engineers"
-            value={stats?.total_engineers ?? stats?.active_users ?? '—'}
-            icon={Users}
-            color="white"
-            delay={0.3}
-          />
+          <KPICard label="Compressor Types" value={units.length} icon={Layers} color="yellow" delay={0} />
+          <KPICard label="Total Units" value={units.reduce((s, t) => s + (t.unit_count ?? 0), 0)} icon={Cpu} color="cyan" delay={0.1} />
+          <KPICard label="Models Trained" value={units.filter(t => t.ml_model).length} icon={Brain} color="green" delay={0.2} />
+          <KPICard label="Active Engineers" value={stats?.total_engineers ?? stats?.active_users ?? '—'} icon={Users} color="white" delay={0.3} />
         </div>
       )}
 
-      {/* Grid */}
       <div>
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-3">
