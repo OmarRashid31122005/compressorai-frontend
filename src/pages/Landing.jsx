@@ -5,11 +5,14 @@ import { Zap, Shield, BarChart3, ChevronRight, Activity, Cpu, TrendingDown, Arro
 import useAuthStore from '../store/authStore'
 
 // ── Photo Imports ─────────────────────────────────────────────
-import TariqJameelPhoto  from '../assets/photos/Sir Tariq Jameel.jpeg'
-import MirzaBaigPhoto    from '../assets/photos/Mirza Muhammad Ali Baig.jpeg'
-import BasitIqbalPhoto   from '../assets/photos/Basit Iqbal Khan.jpeg'
-import MaazAhmedPhoto    from '../assets/photos/Maaz Ahmed.jpeg'
-import OmarRashidPhoto   from '../assets/photos/Omar Rashid.jpg'
+import TariqJameelPhoto         from '../assets/photos/Sir Tariq Jameel.jpeg'
+import MirzaBaigPhoto           from '../assets/photos/Mirza Muhammad Ali Baig.jpeg'
+import BasitIqbalPhoto          from '../assets/photos/Basit Iqbal Khan.jpeg'
+import MaazAhmedPhoto           from '../assets/photos/Maaz Ahmed.jpeg'
+import AliRashidPhoto           from "../assets/photos/Ali Rashid.jpeg"
+import MalikMuhammadRafayPhoto  from "../assets/photos/Rafay.jpeg"
+import MuhammadBilalAkberPhoto  from "../assets/photos/Bilal.jpeg"
+import OmarRashidPhoto          from '../assets/photos/Omar Rashid.jpg'
 // Rafay & Bilal photos not provided — initials avatar will show for them
 
 const CompressorScene = lazy(() => import('../components/ui/CompressorScene'))
@@ -70,7 +73,7 @@ const teamData = {
       role: 'ML Framework Developer',
       sub: 'Industrial outreach · Literature review on compressor operations · Developed ML framework for operational optimization · Operational optimization module of dashboard',
       color: '#00d4ff',
-      photo: null,
+      photo: AliRashidPhoto,
     },
     {
       name: 'Malik Muhammad Rafay',
@@ -78,7 +81,7 @@ const teamData = {
       role: 'Data Engineering & Maintenance',
       sub: 'Industrial outreach · Literature review on maintenance strategies · Data cleaning & preprocessing · Maintenance compliance analysis framework · Maintenance module of dashboard',
       color: '#a78bfa',
-      photo: null,
+      photo: MalikMuhammadRafayPhoto,
     },
     {
       name: 'Muhammad Bilal Akber',
@@ -86,7 +89,7 @@ const teamData = {
       role: 'Lifecycle & Deployment',
       sub: 'Industrial outreach · Studied preventive maintenance & OEM manuals · Literature review on lifecycle cost analysis & operational optimization · Dashboard development & deployment',
       color: '#00c853',
-      photo: null,
+      photo: MuhammadBilalAkberPhoto,
     },
   ],
   technicalContributor: {
