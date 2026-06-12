@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard, BarChart3, BookOpen, Settings,
   LogOut, Zap, ChevronRight, Shield,
-  Wrench, X, Menu, FileText
+  Wrench, X, Menu
 } from 'lucide-react'
 import useAuthStore from '../../store/authStore'
 import toast from 'react-hot-toast'
@@ -92,7 +92,6 @@ function NavList({ collapsed = false, onItemClick, hasAdmin }) {
         <AnalysisNavButton collapsed={collapsed} onClick={onItemClick} />
       </div>
       <NavItem to="/maintenance" icon={Wrench}          label="PM Compliance" collapsed={collapsed} onClick={onItemClick} />
-      <NavItem to="/reports"     icon={FileText}        label="My Reports"    collapsed={collapsed} onClick={onItemClick} />
       <NavItem to="/tutorial"    icon={BookOpen}        label="Tutorial"      collapsed={collapsed} onClick={onItemClick} />
       <NavItem to="/settings"    icon={Settings}        label="Settings"      collapsed={collapsed} onClick={onItemClick} />
       {hasAdmin && (
