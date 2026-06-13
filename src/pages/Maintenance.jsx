@@ -11,7 +11,7 @@
  *  - Maintenance Tutorial tab added (Step 0)
  */
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Upload, FileText, Calendar, Zap, BarChart3, CheckCircle, AlertTriangle,
@@ -438,6 +438,7 @@ function KpiCard({ label, value, sub, color = '#00d4ff', icon: Icon }) {
 // ── Main Component ────────────────────────────────────────────
 export default function Maintenance() {
   const navigate = useNavigate()
+  const location = useLocation()
 
   // Tutorial
   const [showTutorial, setShowTutorial] = useState(false)
@@ -471,8 +472,36 @@ export default function Maintenance() {
 
   // ── Load user units ────────────────────────────────────────
   useEffect(() => {
-    api.get('/compressors/units/my').then(r => setUnits(r.data || [])).catch(() => {})
-  }, [])
+    const navState = location.state
+
+    // If admin navigated here with a preselected unit (from Dashboard AdminTypeCard)
+    if (navState?.preselectedUnit) {
+      const preUnit = navState.preselectedUnit
+      // Add the preselected unit to the list if not already present
+      setUnits(prev => {
+        const exists = prev.find(u => u.id === preUnit.id)
+        return exists ? prev : [preUnit, ...prev]
+      })
+      setUnit(preUnit)
+      // Clear location state so refresh doesn't re-trigger
+      window.history.replaceState({}, '')
+    }
+
+    // Always fetch the user's own linked units too
+    api.get('/compressors/units/my')
+      .then(r => {
+        const myUnits = r.data || []
+        setUnits(prev => {
+          // Merge: keep preselected unit at top, add others without duplicates
+          const merged = [...prev]
+          myUnits.forEach(u => {
+            if (!merged.find(x => x.id === u.id)) merged.push(u)
+          })
+          return merged
+        })
+      })
+      .catch(() => {})
+  }, []) // eslint-disable-line
 
   // ── Load active PM plan when unit selected ─────────────────
   useEffect(() => {
