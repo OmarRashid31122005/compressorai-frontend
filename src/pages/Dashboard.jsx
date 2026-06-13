@@ -128,20 +128,46 @@ function UnitCard({ unit, onUnlink, i }) {
 function AdminTypeCard({ type, i }) {
   const navigate = useNavigate()
 
+  // shared helper — fetch first unit for this type
+  const getFirstUnit = async () => {
+    const res = await api.get(`/compressors/units/search?type_id=${type.id}`)
+    const typeUnits = Array.isArray(res.data)
+      ? res.data
+      : (res.data?.results ?? res.data?.units ?? [])
+    return typeUnits.find(u => u.is_active !== false) || typeUnits[0] || null
+  }
+
   // FIX: was /compressors/units?type_id=... (405 error)
   // Correct endpoint is /compressors/units/search?type_id=...
   const handleOptimize = async (e) => {
     e.stopPropagation()
     try {
-      const res = await api.get(`/compressors/units/search?type_id=${type.id}`)
-      const typeUnits = Array.isArray(res.data)
-        ? res.data
-        : (res.data?.results ?? res.data?.units ?? [])
-
-      const match = typeUnits.find(u => u.is_active !== false) || typeUnits[0]
+      const match = await getFirstUnit()
       if (match) {
         localStorage.setItem('last_unit_id', match.id)
         navigate(`/analysis/${match.id}`)
+      } else {
+        toast('No units found for this compressor type. Add a unit first.', {
+          icon: '⚠️', style: { background:'#0d1a2e', color:'#e2e8f0' }
+        })
+      }
+    } catch {
+      toast.error('Could not load units.')
+    }
+  }
+
+  const handleMaintain = async (e) => {
+    e.stopPropagation()
+    try {
+      const match = await getFirstUnit()
+      if (match) {
+        navigate('/maintenance', {
+          state: {
+            preselectedUnit: match,
+            typeId:   type.id,
+            typeName: type.name,
+          }
+        })
       } else {
         toast('No units found for this compressor type. Add a unit first.', {
           icon: '⚠️', style: { background:'#0d1a2e', color:'#e2e8f0' }
@@ -209,7 +235,7 @@ function AdminTypeCard({ type, i }) {
           onMouseLeave={e => e.currentTarget.style.background='rgba(250,204,21,0.08)'}>
           <BarChart3 size={13}/> Optimize
         </button>
-        <button onClick={e => { e.stopPropagation(); navigate('/maintenance') }}
+        <button onClick={handleMaintain}
           className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl font-display font-600 text-sm transition-all"
           style={{ background:'rgba(34,197,94,0.08)', border:'1px solid rgba(34,197,94,0.2)', color:'#22c55e' }}
           onMouseEnter={e => e.currentTarget.style.background='rgba(34,197,94,0.15)'}
