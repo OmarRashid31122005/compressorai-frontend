@@ -360,7 +360,7 @@ function TeamModal({ onClose }) {
 
           {/* Acknowledgments */}
           <div>
-            <SectionLabel icon={Star} label="Acknowledgments" color="#facc15" />
+            <SectionLabel icon={Star} label="ACKNOWLEDGEMENT" color="#facc15" />
             <div
               className="rounded-2xl p-5 space-y-3"
               style={{ background: 'rgba(250,204,21,0.03)', border: '1px solid rgba(250,204,21,0.1)' }}
