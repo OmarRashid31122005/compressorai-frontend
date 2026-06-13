@@ -209,7 +209,7 @@ function TeamModal({ onClose }) {
             <div>
               <div className="font-display font-800 text-white text-base">CompressorAI</div>
               <div className="text-yellow-400 text-xs font-mono mt-0.5">
-                Final Year Project · B.E. Computer Systems Engineering
+                Final Year Project · B.E Mechanical Engineering
               </div>
               <div className="text-slate-400 text-xs mt-1">
                 NED University of Engineering &amp; Technology, Karachi
