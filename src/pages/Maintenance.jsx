@@ -9,6 +9,9 @@
  *  - Table heading "Status" → "Recency Status"
  *  - Table heading "Cost"   → "Total Cost"
  *  - Maintenance Tutorial tab added (Step 0)
+ *  - FIXED: Charts — full Y-axis labels, no truncation, proper height
+ *  - FIXED: Compliance chart ReferenceLine label no longer appears mid-graph
+ *  - ADDED: Print / Download Report button (well-formatted HTML print)
  */
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
@@ -17,12 +20,12 @@ import {
   Upload, FileText, Calendar, Zap, BarChart3, CheckCircle, AlertTriangle,
   XCircle, Clock, TrendingDown, RefreshCw, ChevronDown, ChevronUp,
   Settings, FileSpreadsheet, Activity, Plus, Minus, Info, Eye,
-  ArrowRight, Gauge, Wrench, BookOpen, ChevronLeft, ChevronRight
+  ArrowRight, Gauge, Wrench, BookOpen, ChevronLeft, ChevronRight, Printer
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, Cell, ReferenceLine, Legend
+  ResponsiveContainer, Cell, ReferenceLine, Legend, LabelList
 } from 'recharts'
 import api from '../utils/api'
 
@@ -198,7 +201,6 @@ function MaintenanceTutorial({ onClose }) {
         className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl"
         style={{ background: 'rgba(8,20,40,0.98)', border: '1px solid rgba(0,212,255,0.15)', boxShadow: '0 40px 100px rgba(0,0,0,0.7)' }}>
 
-        {/* Header */}
         <div className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 border-b"
           style={{ background: 'rgba(8,20,40,0.98)', borderColor: 'rgba(255,255,255,0.07)' }}>
           <div className="flex items-center gap-3">
@@ -215,7 +217,6 @@ function MaintenanceTutorial({ onClose }) {
           </button>
         </div>
 
-        {/* Progress dots */}
         <div className="flex items-center gap-2 px-6 pt-4">
           {tutorialSteps.map((_, i) => (
             <button key={i} onClick={() => setCurrent(i)}
@@ -228,25 +229,19 @@ function MaintenanceTutorial({ onClose }) {
           <span className="text-xs text-slate-600 font-mono ml-auto">{current + 1} / {tutorialSteps.length}</span>
         </div>
 
-        {/* Content */}
         <AnimatePresence mode="wait">
           <motion.div key={current}
             initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
             className="px-6 py-5 space-y-4">
-
             <div>
               <div className="text-xs font-mono mb-1" style={{ color: step.color }}>Step {current + 1} of {tutorialSteps.length}</div>
               <h3 className="font-display font-800 text-white text-xl">{step.title}</h3>
               <p className="text-slate-400 text-sm leading-relaxed mt-2">{step.content}</p>
             </div>
-
-            {/* Highlight */}
             <div className="rounded-xl px-4 py-3 text-sm font-mono border-l-2"
               style={{ background: `${step.color}08`, borderColor: step.color, color: step.color }}>
               {step.highlight}
             </div>
-
-            {/* Visual */}
             <div className="rounded-2xl p-4"
               style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)' }}>
               {step.visual}
@@ -254,7 +249,6 @@ function MaintenanceTutorial({ onClose }) {
           </motion.div>
         </AnimatePresence>
 
-        {/* Footer nav */}
         <div className="flex items-center justify-between px-6 py-4 border-t"
           style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
           <button onClick={() => current > 0 && setCurrent(c => c - 1)}
@@ -263,7 +257,6 @@ function MaintenanceTutorial({ onClose }) {
             style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#94a3b8' }}>
             <ChevronLeft size={14} /> Previous
           </button>
-
           {current < tutorialSteps.length - 1 ? (
             <button onClick={() => setCurrent(c => c + 1)}
               className="flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-display font-700 text-[#080e1a] transition-all"
@@ -281,6 +274,263 @@ function MaintenanceTutorial({ onClose }) {
       </motion.div>
     </div>
   )
+}
+
+// ── Print Report ───────────────────────────────────────────────
+function printReport({ results, stages, unit }) {
+  if (!results) return
+  const s = results.summary || {}
+  const now = new Date().toLocaleString('en-PK', { timeZone: 'Asia/Karachi', dateStyle: 'long', timeStyle: 'short' })
+
+  const COMPLIANCE_STYLE = (v) =>
+    v >= 90 ? 'color:#006400;font-weight:700' : v >= 70 ? 'color:#856404;font-weight:700' : 'color:#842029;font-weight:700'
+
+  const RECENCY_STYLE = (r) =>
+    r === 'OK' ? 'color:#006400' : r === 'Due Soon' ? 'color:#856404' : 'color:#842029'
+
+  const INTERVAL_STYLE = (r) =>
+    r === 'On Track' ? 'color:#006400' : r === 'Over-maintained' ? 'color:#0c6478' : r === 'Never Performed' ? 'color:#842029' : 'color:#842029'
+
+  const taskRows = (results.results || []).map(row => `
+    <tr>
+      <td>${row.task}<br/><small style="color:#666">Every ${row.interval_hours?.toLocaleString()} hrs</small></td>
+      <td style="text-align:center;${COMPLIANCE_STYLE(row.compliance_pct)}">${row.compliance_pct}%</td>
+      <td style="text-align:center">${row.expected_pm}</td>
+      <td style="text-align:center">${row.actual_pm}</td>
+      <td style="text-align:center;color:#666">${row.raw_wo_count ?? row.actual_pm}</td>
+      <td style="text-align:center;${INTERVAL_STYLE(row.interval_status)}">${row.interval_ratio != null ? row.interval_ratio + 'x' : '—'}<br/><small>${row.interval_status}</small></td>
+      <td style="text-align:center;${RECENCY_STYLE(row.recency_status)}">${row.recency_status}</td>
+      <td style="text-align:center;color:${row.delay_hours > 0 ? '#842029' : '#666'}">${row.delay_hours > 0 ? '+' + row.delay_hours?.toLocaleString() + ' hrs' : '—'}</td>
+      <td style="text-align:center">${row.total_cost > 0 ? 'PKR ' + row.total_cost?.toLocaleString() : '—'}</td>
+    </tr>
+  `).join('')
+
+  const eventSections = (results.results || []).map(row => {
+    if (!row.events?.length) return ''
+    const evRows = row.events.map(ev => `
+      <tr>
+        <td style="font-family:monospace">${ev.running_hours?.toLocaleString()} hrs</td>
+        <td>${ev.date}</td>
+        <td>${ev.description}</td>
+        <td style="text-align:right">${ev.cost > 0 ? 'PKR ' + ev.cost?.toLocaleString() : '—'}</td>
+      </tr>
+    `).join('')
+    return `
+      <div class="event-block">
+        <h4>${row.task} <span style="font-weight:400;color:#555">— Every ${row.interval_hours?.toLocaleString()} hrs</span></h4>
+        <table>
+          <thead><tr><th>Running Hours</th><th>Date</th><th>Description</th><th style="text-align:right">Cost (PKR)</th></tr></thead>
+          <tbody>${evRows}</tbody>
+        </table>
+      </div>
+    `
+  }).join('')
+
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <title>PM Compliance Report — ${results.unit_label || unit?.unit_id || ''}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 11px; color: #1a1a2e; background: #fff; }
+
+    /* ── Cover Header ── */
+    .cover {
+      background: linear-gradient(135deg, #0a1628 0%, #0d2040 100%);
+      color: white; padding: 36px 48px; margin-bottom: 0;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .cover-left h1 { font-size: 22px; font-weight: 800; letter-spacing: -0.5px; }
+    .cover-left h1 span { color: #00d4ff; }
+    .cover-left p { color: #94a3b8; font-size: 11px; margin-top: 4px; }
+    .cover-right { text-align: right; }
+    .cover-right .unit { font-size: 20px; font-weight: 700; color: #facc15; }
+    .cover-right .meta { color: #64748b; font-size: 10px; margin-top: 4px; line-height: 1.6; }
+
+    /* ── Section headers ── */
+    .section-title {
+      font-size: 12px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 1px; color: #0a1628;
+      border-bottom: 2px solid #0a1628; padding-bottom: 5px;
+      margin: 24px 0 12px;
+    }
+
+    /* ── KPI Strip ── */
+    .kpi-strip {
+      display: grid; grid-template-columns: repeat(6, 1fr);
+      gap: 0; border: 1px solid #dde1e7; border-radius: 8px;
+      overflow: hidden; margin-bottom: 20px;
+    }
+    .kpi { padding: 14px 12px; text-align: center; border-right: 1px solid #dde1e7; }
+    .kpi:last-child { border-right: none; }
+    .kpi .val { font-size: 22px; font-weight: 800; }
+    .kpi .lbl { font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b; margin-top: 3px; }
+
+    /* ── Over-maint alert ── */
+    .alert-box {
+      border: 1px solid #f5c2c7; background: #fff5f5;
+      border-radius: 6px; padding: 10px 14px; margin-bottom: 20px;
+      font-size: 11px; color: #842029;
+    }
+    .alert-box strong { color: #6b0011; }
+
+    /* ── Params table ── */
+    .params-grid {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 6px; margin-bottom: 20px;
+    }
+    .param-row {
+      display: flex; justify-content: space-between;
+      border-bottom: 1px solid #f0f0f0; padding: 5px 0;
+      font-size: 10px;
+    }
+    .param-row .pk { color: #555; }
+    .param-row .pv { font-weight: 600; color: #0a1628; }
+
+    /* ── Tables ── */
+    table { width: 100%; border-collapse: collapse; font-size: 10px; }
+    th {
+      background: #0a1628; color: white; padding: 7px 8px;
+      text-align: left; font-weight: 600; font-size: 9px;
+      text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    td { padding: 7px 8px; border-bottom: 1px solid #e8eaf0; vertical-align: top; }
+    tr:nth-child(even) td { background: #f8f9fb; }
+    tr:last-child td { border-bottom: none; }
+
+    /* ── Event detail blocks ── */
+    .event-block { margin-bottom: 18px; break-inside: avoid; }
+    .event-block h4 {
+      font-size: 11px; font-weight: 700; color: #0a1628;
+      background: #f0f4ff; padding: 7px 10px;
+      border-left: 3px solid #00d4ff; margin-bottom: 6px;
+    }
+
+    /* ── Footer ── */
+    .footer {
+      text-align: center; font-size: 9px; color: #94a3b8;
+      border-top: 1px solid #e8eaf0; padding: 10px 0;
+      margin-top: 24px;
+    }
+
+    /* ── Body padding ── */
+    .body-wrap { padding: 20px 40px; }
+
+    @media print {
+      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .section-title { break-before: auto; }
+      .event-block { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Cover -->
+<div class="cover">
+  <div class="cover-left">
+    <h1>Compressor<span>AI</span> — PM Compliance Report</h1>
+    <p>Industrial Air Compressor Optimizer · v6.0 · PM Compliance Analysis Module</p>
+  </div>
+  <div class="cover-right">
+    <div class="unit">${results.unit_label || unit?.unit_id || '—'}</div>
+    <div class="meta">
+      Generated: ${now}<br/>
+      Work Order File: ${results.wo_filename || '—'}<br/>
+      Start Date: ${results.start_date || '—'} &nbsp;|&nbsp; Stages: ${stages}
+    </div>
+  </div>
+</div>
+
+<div class="body-wrap">
+
+  <!-- KPI Strip -->
+  <div class="section-title">Analysis Summary</div>
+  <div class="kpi-strip">
+    <div class="kpi">
+      <div class="val" style="color:#006400">${s.avg_compliance_pct ?? '—'}%</div>
+      <div class="lbl">Avg Compliance</div>
+    </div>
+    <div class="kpi">
+      <div class="val" style="color:#0c6478">${s.total_hours_analyzed?.toLocaleString() ?? '—'}</div>
+      <div class="lbl">Total Hours</div>
+    </div>
+    <div class="kpi">
+      <div class="val" style="color:#1a1a2e">${s.total_tasks ?? '—'}</div>
+      <div class="lbl">PM Tasks</div>
+    </div>
+    <div class="kpi">
+      <div class="val" style="color:#842029">${s.overdue_count ?? '—'}</div>
+      <div class="lbl">Overdue Tasks</div>
+    </div>
+    <div class="kpi">
+      <div class="val" style="color:#856404">${s.due_soon_count ?? '—'}</div>
+      <div class="lbl">Due Soon</div>
+    </div>
+    <div class="kpi">
+      <div class="val" style="color:#0c6478">${s.over_maint_count ?? '—'}</div>
+      <div class="lbl">Over-maintained</div>
+    </div>
+  </div>
+
+  <!-- Over-maint cost alert -->
+  ${s.over_maint_cost > 0 ? `
+  <div class="alert-box">
+    ⚠️ <strong>Over-maintenance Cost: PKR ${s.over_maint_cost?.toLocaleString()}</strong>
+    — expenditure incurred from performing maintenance more frequently than required by the PM plan.
+  </div>` : ''}
+
+  <!-- Operating Parameters -->
+  <div class="section-title">Operating Parameters</div>
+  <div class="params-grid">
+    <div>
+      <div class="param-row"><span class="pk">Compressor Unit</span><span class="pv">${results.unit_label || '—'}</span></div>
+      <div class="param-row"><span class="pk">Start Date</span><span class="pv">${results.start_date || '—'}</span></div>
+      <div class="param-row"><span class="pk">Total Operating Hours</span><span class="pv">${results.total_hours?.toLocaleString() || '—'} hrs</span></div>
+      <div class="param-row"><span class="pk">Compression Stages</span><span class="pv">${stages}</span></div>
+    </div>
+    <div>
+      <div class="param-row"><span class="pk">Work Order File</span><span class="pv">${results.wo_filename || '—'}</span></div>
+      <div class="param-row"><span class="pk">WO Rows Matched</span><span class="pv">${results.matched_rows ?? '—'} of ${results.wo_rows ?? '—'}</span></div>
+      ${results.analysis_id ? `<div class="param-row"><span class="pk">Analysis ID</span><span class="pv" style="font-family:monospace;font-size:9px">${results.analysis_id}</span></div>` : ''}
+    </div>
+  </div>
+
+  <!-- Compliance Table -->
+  <div class="section-title">PM Task Compliance Results</div>
+  <table>
+    <thead>
+      <tr>
+        <th>PM Task</th>
+        <th style="text-align:center">Compliance</th>
+        <th style="text-align:center">Expected</th>
+        <th style="text-align:center">Actual</th>
+        <th style="text-align:center">Raw WOs</th>
+        <th style="text-align:center">Interval Ratio</th>
+        <th style="text-align:center">Recency Status</th>
+        <th style="text-align:center">Delay</th>
+        <th style="text-align:center">Total Cost</th>
+      </tr>
+    </thead>
+    <tbody>${taskRows}</tbody>
+  </table>
+
+  <!-- Work Order Events -->
+  <div class="section-title" style="margin-top:28px">Detailed Task Analysis — Work Order Events</div>
+  ${eventSections}
+
+  <div class="footer">
+    CompressorAI v6.0 · PM Compliance Analysis Module · ${now} · Unit: ${results.unit_label || '—'}
+  </div>
+
+</div>
+</body>
+</html>`
+
+  const win = window.open('', '_blank')
+  win.document.write(html)
+  win.document.close()
+  win.onload = () => win.print()
 }
 
 // ── File Drop Zone ────────────────────────────────────────────
@@ -377,14 +627,12 @@ function ComplianceRow({ row, i }) {
           </div>
           <div className="text-xs mt-0.5" style={{ color: intColor }}>{row.interval_status}</div>
         </td>
-        {/* ✅ CHANGED: "Status" → "Recency Status" (shown in header, badge unchanged) */}
         <td className="px-4 py-3 text-center"><StatusBadge status={row.recency_status} type="recency" /></td>
         <td className="px-4 py-3 text-center">
           {row.delay_hours > 0
             ? <span className="text-xs font-mono text-red-400">+{row.delay_hours.toLocaleString()} hrs</span>
             : <span className="text-xs text-slate-600">—</span>}
         </td>
-        {/* ✅ CHANGED: "Cost" → "Total Cost" (shown in header) */}
         <td className="px-4 py-3 text-center">
           <div className="text-xs font-mono text-slate-400">{row.total_cost > 0 ? `PKR ${row.total_cost.toLocaleString()}` : '—'}</div>
         </td>
@@ -435,75 +683,168 @@ function KpiCard({ label, value, sub, color = '#00d4ff', icon: Icon }) {
   )
 }
 
+// ── Custom Y-Axis Tick (full label, no truncation) ────────────
+const FullYAxisTick = ({ x, y, payload }) => {
+  const words = payload.value.split(' ')
+  const lines = []
+  let line = ''
+  words.forEach(word => {
+    const test = line ? line + ' ' + word : word
+    if (test.length > 22) { lines.push(line); line = word }
+    else line = test
+  })
+  if (line) lines.push(line)
+
+  return (
+    <g transform={`translate(${x},${y})`}>
+      {lines.map((l, i) => (
+        <text key={i} x={0} y={0} dy={i * 11 - ((lines.length - 1) * 5.5)} textAnchor="end"
+          fill="#94a3b8" fontSize={9} fontFamily="monospace">
+          {l}
+        </text>
+      ))}
+    </g>
+  )
+}
+
+// ── Chart: Planned vs Actual ──────────────────────────────────
+function IntervalChart({ data }) {
+  const rowH   = 52
+  const height = Math.max(300, data.length * rowH + 60)
+  const yWidth = 200
+
+  return (
+    <ResponsiveContainer width="100%" height={height}>
+      <BarChart data={data} layout="vertical"
+        margin={{ top: 10, right: 60, left: 10, bottom: 10 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#1e3a5f" horizontal={false} />
+        <XAxis
+          type="number" stroke="#64748b"
+          tick={{ fontSize: 10, fill: '#64748b' }}
+          tickFormatter={v => v.toLocaleString()}
+          label={{ value: 'Hours (hrs)', position: 'insideBottom', offset: -2, fill: '#64748b', fontSize: 10 }}
+        />
+        <YAxis
+          type="category" dataKey="fullName"
+          width={yWidth}
+          tick={<FullYAxisTick />}
+          interval={0}
+        />
+        <Tooltip
+          contentStyle={{ background: '#0d1a2e', border: '1px solid rgba(0,212,255,0.2)', borderRadius: '8px', fontSize: '11px' }}
+          formatter={(v, n) => [v.toLocaleString() + ' hrs', n]}
+        />
+        <Legend
+          iconType="square"
+          wrapperStyle={{ fontSize: 11, paddingTop: 10 }}
+        />
+        <Bar dataKey="expected" name="Target Interval" fill="#334155" radius={[0, 3, 3, 0]} barSize={14}>
+          <LabelList dataKey="expected" position="right" formatter={v => v.toLocaleString()} style={{ fill: '#64748b', fontSize: 9 }} />
+        </Bar>
+        <Bar dataKey="actual" name="Avg Actual Interval" fill="#00d4ff" radius={[0, 3, 3, 0]} barSize={14}>
+          <LabelList dataKey="actual" position="right" formatter={v => v > 0 ? v.toLocaleString() : '—'} style={{ fill: '#00d4ff', fontSize: 9 }} />
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
+  )
+}
+
+// ── Chart: Compliance % ───────────────────────────────────────
+function ComplianceChart({ data }) {
+  const rowH   = 52
+  const height = Math.max(300, data.length * rowH + 60)
+  const yWidth = 200
+  const maxDomain = Math.max(150, ...data.map(d => d.compliance || 0)) + 20
+
+  return (
+    <ResponsiveContainer width="100%" height={height}>
+      <BarChart data={data} layout="vertical"
+        margin={{ top: 10, right: 60, left: 10, bottom: 10 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#1e3a5f" horizontal={false} />
+        <XAxis
+          type="number"
+          domain={[0, maxDomain]}
+          stroke="#64748b"
+          tick={{ fontSize: 10, fill: '#64748b' }}
+          tickFormatter={v => v + '%'}
+          label={{ value: 'Compliance (%)', position: 'insideBottom', offset: -2, fill: '#64748b', fontSize: 10 }}
+        />
+        <YAxis
+          type="category" dataKey="fullName"
+          width={yWidth}
+          tick={<FullYAxisTick />}
+          interval={0}
+        />
+        <Tooltip
+          contentStyle={{ background: '#0d1a2e', border: '1px solid rgba(0,212,255,0.2)', borderRadius: '8px', fontSize: '11px' }}
+          formatter={v => [v + '%', 'Compliance']}
+        />
+        {/* ReferenceLine with NO label — label caused the floating "100" number */}
+        <ReferenceLine x={100} stroke="#00c853" strokeDasharray="5 3" strokeWidth={1.5} />
+        {/* Put 100% label outside chart via custom tick instead */}
+        <Bar dataKey="compliance" name="Compliance %" radius={[0, 3, 3, 0]} barSize={14}>
+          {data.map((entry, i) => (
+            <Cell key={i} fill={COMPLIANCE_COLOR(entry.compliance)} />
+          ))}
+          <LabelList dataKey="compliance" position="right" formatter={v => v + '%'}
+            style={{ fontSize: 9, fontWeight: 700 }}
+            content={({ x, y, width, value }) => (
+              <text x={x + width + 6} y={y + 10}
+                fill={COMPLIANCE_COLOR(value)} fontSize={9} fontWeight={700}>
+                {value}%
+              </text>
+            )}
+          />
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
+  )
+}
+
 // ── Main Component ────────────────────────────────────────────
 export default function Maintenance() {
   const navigate = useNavigate()
   const location = useLocation()
 
-  // Tutorial
   const [showTutorial, setShowTutorial] = useState(false)
+  const [step, setStep]                 = useState(1)
+  const [units, setUnits]               = useState([])
+  const [selectedUnit, setUnit]         = useState(null)
+  const [pmFile, setPmFile]             = useState(null)
+  const [woFile, setWoFile]             = useState(null)
+  const [activePlan, setActivePlan]     = useState(null)
+  const [planLoading, setPlanLoading]   = useState(false)
+  const [startDate, setStartDate]       = useState('')
+  const [numYears, setNumYears]         = useState(1)
+  const [yearlyHours, setYearlyHours]   = useState([1866])
+  const [stages, setStages]             = useState(2)
+  const [loading, setLoading]           = useState(false)
+  const [results, setResults]           = useState(null)
+  const [history, setHistory]           = useState([])
 
-  // Step management
-  const [step, setStep] = useState(1)  // 1=Setup, 2=Config, 3=Results
-
-  // Unit selection
-  const [units, setUnits]       = useState([])
-  const [selectedUnit, setUnit] = useState(null)
-
-  // Files
-  const [pmFile, setPmFile]     = useState(null)
-  const [woFile, setWoFile]     = useState(null)
-
-  // PM plan from DB
-  const [activePlan, setActivePlan]   = useState(null)
-  const [planLoading, setPlanLoading] = useState(false)
-
-  // Configuration
-  const [startDate, setStartDate]   = useState('')
-  const [numYears, setNumYears]     = useState(1)
-  const [yearlyHours, setYearlyHours] = useState([1866])
-  // ✅ NEW: Stages input
-  const [stages, setStages] = useState(2)
-
-  // Analysis
-  const [loading, setLoading]   = useState(false)
-  const [results, setResults]   = useState(null)
-  const [history, setHistory]   = useState([])
-
-  // ── Load user units ────────────────────────────────────────
   useEffect(() => {
     const navState = location.state
-
-    // If admin navigated here with a preselected unit (from Dashboard AdminTypeCard)
     if (navState?.preselectedUnit) {
       const preUnit = navState.preselectedUnit
-      // Add the preselected unit to the list if not already present
       setUnits(prev => {
         const exists = prev.find(u => u.id === preUnit.id)
         return exists ? prev : [preUnit, ...prev]
       })
       setUnit(preUnit)
-      // Clear location state so refresh doesn't re-trigger
       window.history.replaceState({}, '')
     }
-
-    // Always fetch the user's own linked units too
     api.get('/compressors/units/my')
       .then(r => {
         const myUnits = r.data || []
         setUnits(prev => {
-          // Merge: keep preselected unit at top, add others without duplicates
           const merged = [...prev]
-          myUnits.forEach(u => {
-            if (!merged.find(x => x.id === u.id)) merged.push(u)
-          })
+          myUnits.forEach(u => { if (!merged.find(x => x.id === u.id)) merged.push(u) })
           return merged
         })
       })
       .catch(() => {})
   }, []) // eslint-disable-line
 
-  // ── Load active PM plan when unit selected ─────────────────
   useEffect(() => {
     if (!selectedUnit) { setActivePlan(null); return }
     setPlanLoading(true)
@@ -511,13 +852,11 @@ export default function Maintenance() {
       .then(r => setActivePlan(r.data))
       .catch(() => setActivePlan(null))
       .finally(() => setPlanLoading(false))
-
     api.get(`/maintenance/history/${selectedUnit.id}`)
       .then(r => setHistory(r.data || []))
       .catch(() => setHistory([]))
   }, [selectedUnit])
 
-  // ── Sync year inputs ───────────────────────────────────────
   const handleNumYears = (n) => {
     const clamped = Math.max(1, Math.min(20, n))
     setNumYears(clamped)
@@ -528,7 +867,6 @@ export default function Maintenance() {
     })
   }
 
-  // ── Upload PM Plan ─────────────────────────────────────────
   const handleUploadPM = async () => {
     if (!pmFile || !selectedUnit) return
     const fd = new FormData()
@@ -543,7 +881,6 @@ export default function Maintenance() {
     }
   }
 
-  // ── Run Analysis ───────────────────────────────────────────
   const handleAnalyze = async () => {
     if (!woFile)                 { toast.error('Upload a Work Order file first'); return }
     if (!selectedUnit)           { toast.error('Select a compressor unit'); return }
@@ -551,17 +888,15 @@ export default function Maintenance() {
     if (yearlyHours.some(h => !h || h <= 0)) { toast.error('All yearly hours must be > 0'); return }
     if (!stages || stages < 1)   { toast.error('Stages must be at least 1'); return }
 
-    setLoading(true)
-    setResults(null)
+    setLoading(true); setResults(null)
     try {
       const fd = new FormData()
       fd.append('wo_file',      woFile)
       if (startDate) fd.append('start_date', startDate)
       fd.append('yearly_hours', JSON.stringify(yearlyHours))
-      fd.append('stages',       String(stages))   // ✅ NEW: pass stages to backend
+      fd.append('stages',       String(stages))
       const r = await api.post(`/maintenance/analyze/${selectedUnit.id}`, fd)
-      setResults(r.data)
-      setStep(3)
+      setResults(r.data); setStep(3)
       toast.success('Analysis complete!')
       api.get(`/maintenance/history/${selectedUnit.id}`).then(h => setHistory(h.data || []))
     } catch (err) {
@@ -571,37 +906,31 @@ export default function Maintenance() {
     }
   }
 
-  // ── Load past analysis ─────────────────────────────────────
   const loadHistoryItem = async (id) => {
     try {
       const r = await api.get(`/maintenance/analysis/${id}`)
-      setResults(r.data)
-      setStep(3)
+      setResults(r.data); setStep(3)
     } catch { toast.error('Failed to load analysis') }
   }
 
-  // ── Derived chart data ─────────────────────────────────────
+  // Chart data — use fullName (no truncation) for Y-axis
   const chartData = results?.results?.map(r => ({
-    name:        r.task.length > 28 ? r.task.slice(0, 26) + '…' : r.task,
-    fullName:    r.task,
-    expected:    r.interval_hours,
-    actual:      r.avg_interval || 0,
-    compliance:  r.compliance_pct,
-    overCost:    r.over_maint_cost,
+    name:       r.task.length > 28 ? r.task.slice(0, 26) + '…' : r.task,
+    fullName:   r.task,
+    expected:   r.interval_hours,
+    actual:     r.avg_interval || 0,
+    compliance: r.compliance_pct,
+    overCost:   r.over_maint_cost,
   })) || []
 
   const s = results?.summary || {}
 
-  // ═══════════════════════════════════════════════════════════
-  // RENDER
-  // ═══════════════════════════════════════════════════════════
   return (
     <div className="space-y-6 page-enter">
 
-      {/* Tutorial Modal */}
       {showTutorial && <MaintenanceTutorial onClose={() => setShowTutorial(false)} />}
 
-      {/* ── Header ── */}
+      {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="font-display font-800 text-3xl text-white flex items-center gap-3">
@@ -611,26 +940,33 @@ export default function Maintenance() {
             Compare actual maintenance against PM plan — compliance, intervals, overdue status
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          {/* ✅ NEW: Tutorial button */}
+        <div className="flex items-center gap-2 flex-wrap">
           <button onClick={() => setShowTutorial(true)}
             className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-display font-600 transition-all"
             style={{ background: 'rgba(250,204,21,0.08)', border: '1px solid rgba(250,204,21,0.2)', color: '#facc15' }}>
             <BookOpen size={14} /> Tutorial
           </button>
           {results && (
-            <button onClick={() => setStep(step === 3 ? 1 : 3)}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-display font-600 transition-all"
-              style={{ background: 'rgba(0,212,255,0.08)', border: '1px solid rgba(0,212,255,0.2)', color: '#00d4ff' }}>
-              {step === 3 ? <Settings size={14} /> : <BarChart3 size={14} />}
-              {step === 3 ? 'New Analysis' : 'View Results'}
-            </button>
+            <>
+              {/* Print Report button */}
+              <button
+                onClick={() => printReport({ results, stages, unit: selectedUnit })}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-display font-600 transition-all"
+                style={{ background: 'rgba(0,200,83,0.08)', border: '1px solid rgba(0,200,83,0.25)', color: '#00c853' }}>
+                <Printer size={14} /> Print Report
+              </button>
+              <button onClick={() => setStep(step === 3 ? 1 : 3)}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-display font-600 transition-all"
+                style={{ background: 'rgba(0,212,255,0.08)', border: '1px solid rgba(0,212,255,0.2)', color: '#00d4ff' }}>
+                {step === 3 ? <Settings size={14} /> : <BarChart3 size={14} />}
+                {step === 3 ? 'New Analysis' : 'View Results'}
+              </button>
+            </>
           )}
         </div>
       </div>
 
-      {/* ── Step Indicator ── */}
-      {/* ✅ "Sound" option REMOVED — only Setup, Configure, Results */}
+      {/* Step Indicator */}
       <div className="flex items-center gap-3">
         {[
           { n: 1, label: 'Setup' },
@@ -656,13 +992,9 @@ export default function Maintenance() {
         ))}
       </div>
 
-      {/* ═══════════════════════════════════════════════════════
-          STEP 1 — SETUP
-      ═══════════════════════════════════════════════════════ */}
+      {/* ── STEP 1 — SETUP ── */}
       {step === 1 && (
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-5">
-
-          {/* Unit Selection */}
           <div className="card">
             <h2 className="font-display font-700 text-white text-lg mb-4 flex items-center gap-2">
               <Zap size={16} className="text-cyan-400" /> Select Compressor Unit
@@ -688,7 +1020,6 @@ export default function Maintenance() {
 
           {selectedUnit && (
             <>
-              {/* PM Plan Upload */}
               <div className="card">
                 <h2 className="font-display font-700 text-white text-lg mb-1 flex items-center gap-2">
                   <FileSpreadsheet size={16} className="text-yellow-400" /> PM Plan
@@ -734,7 +1065,6 @@ export default function Maintenance() {
             </>
           )}
 
-          {/* History */}
           {selectedUnit && history.length > 0 && (
             <div className="card">
               <h3 className="font-display font-600 text-white text-sm mb-3 flex items-center gap-2">
@@ -766,15 +1096,10 @@ export default function Maintenance() {
         </motion.div>
       )}
 
-      {/* ═══════════════════════════════════════════════════════
-          STEP 2 — CONFIGURE
-      ═══════════════════════════════════════════════════════ */}
+      {/* ── STEP 2 — CONFIGURE ── */}
       {step === 2 && (
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-5">
-
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-
-            {/* Work Order Upload */}
             <div className="card">
               <h2 className="font-display font-700 text-white text-lg mb-1 flex items-center gap-2">
                 <FileText size={16} className="text-cyan-400" /> Work Order File
@@ -791,13 +1116,11 @@ export default function Maintenance() {
               />
             </div>
 
-            {/* Date + Hours + Stages Config */}
             <div className="card space-y-4">
               <h2 className="font-display font-700 text-white text-lg flex items-center gap-2">
                 <Settings size={16} className="text-yellow-400" /> Operating Parameters
               </h2>
 
-              {/* Start Date — optional */}
               <div>
                 <label className="label">
                   Compressor Start / Commissioning Date
@@ -808,12 +1131,9 @@ export default function Maintenance() {
                   <input type="date" className="input-field pl-10 text-sm"
                     value={startDate} onChange={e => setStartDate(e.target.value)} />
                 </div>
-                <p className="text-xs text-slate-600 mt-1">
-                  Leave blank → auto-detected as earliest date in your WO file
-                </p>
+                <p className="text-xs text-slate-600 mt-1">Leave blank → auto-detected as earliest date in your WO file</p>
               </div>
 
-              {/* ✅ NEW: Stages input */}
               <div>
                 <label className="label">Number of Compression Stages</label>
                 <div className="flex items-center gap-3">
@@ -830,12 +1150,9 @@ export default function Maintenance() {
                   </button>
                   <span className="text-slate-500 text-sm">compression stages</span>
                 </div>
-                <p className="text-xs text-slate-600 mt-1">
-                  Most industrial Rotary Screw Compressors = 2 stages
-                </p>
+                <p className="text-xs text-slate-600 mt-1">Most industrial Rotary Screw Compressors = 2 stages</p>
               </div>
 
-              {/* Number of Years */}
               <div>
                 <label className="label">Number of Operating Years</label>
                 <div className="flex items-center gap-3">
@@ -854,8 +1171,6 @@ export default function Maintenance() {
                 </div>
               </div>
 
-              {/* Per-year hours */}
-              {/* ✅ "Operating days per year" REMOVED — only Annual Running Hours */}
               <div>
                 <label className="label">Annual Running Hours per Year</label>
                 <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
@@ -887,7 +1202,6 @@ export default function Maintenance() {
             </div>
           </div>
 
-          {/* Action Buttons */}
           <div className="flex gap-3">
             <button onClick={() => setStep(1)} className="btn-ghost py-3 px-6 text-sm">← Back</button>
             <button onClick={handleAnalyze} disabled={loading || !woFile}
@@ -899,7 +1213,6 @@ export default function Maintenance() {
             </button>
           </div>
 
-          {/* Info box */}
           <div className="rounded-xl p-4 flex items-start gap-3"
             style={{ background: 'rgba(0,212,255,0.04)', border: '1px solid rgba(0,212,255,0.1)' }}>
             <Info size={14} className="text-cyan-400 flex-shrink-0 mt-0.5" />
@@ -912,23 +1225,20 @@ export default function Maintenance() {
         </motion.div>
       )}
 
-      {/* ═══════════════════════════════════════════════════════
-          STEP 3 — RESULTS
-      ═══════════════════════════════════════════════════════ */}
+      {/* ── STEP 3 — RESULTS ── */}
       {step === 3 && results && (
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
 
-          {/* ── Summary KPIs ── */}
+          {/* KPIs */}
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
-            <KpiCard label="Avg Compliance"   value={`${s.avg_compliance_pct}%`}     color={COMPLIANCE_COLOR(s.avg_compliance_pct)} icon={Gauge} />
-            <KpiCard label="Total Hours"      value={s.total_hours_analyzed?.toLocaleString()} sub="hrs analyzed" color="#00d4ff" icon={Clock} />
-            <KpiCard label="Tasks Analyzed"   value={s.total_tasks}                   color="#facc15"  icon={CheckCircle} />
-            <KpiCard label="Overdue Tasks"    value={s.overdue_count}                 color={s.overdue_count > 0 ? '#ef4444' : '#00c853'} icon={XCircle} />
-            <KpiCard label="Due Soon"         value={s.due_soon_count}                color="#facc15"  icon={AlertTriangle} />
-            <KpiCard label="Over-maintained"  value={s.over_maint_count}              color="#00d4ff"  icon={TrendingDown} />
+            <KpiCard label="Avg Compliance"   value={`${s.avg_compliance_pct}%`}                    color={COMPLIANCE_COLOR(s.avg_compliance_pct)} icon={Gauge} />
+            <KpiCard label="Total Hours"      value={s.total_hours_analyzed?.toLocaleString()}        sub="hrs analyzed" color="#00d4ff" icon={Clock} />
+            <KpiCard label="Tasks Analyzed"   value={s.total_tasks}                                   color="#facc15"  icon={CheckCircle} />
+            <KpiCard label="Overdue Tasks"    value={s.overdue_count}                                 color={s.overdue_count > 0 ? '#ef4444' : '#00c853'} icon={XCircle} />
+            <KpiCard label="Due Soon"         value={s.due_soon_count}                                color="#facc15"  icon={AlertTriangle} />
+            <KpiCard label="Over-maintained"  value={s.over_maint_count}                              color="#00d4ff"  icon={TrendingDown} />
           </div>
 
-          {/* ── Over-maintenance Cost Alert ── */}
           {s.over_maint_cost > 0 && (
             <div className="rounded-xl p-4 flex items-center gap-3"
               style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)' }}>
@@ -941,54 +1251,28 @@ export default function Maintenance() {
             </div>
           )}
 
-          {/* ── Charts Grid ── */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-
-            {/* Chart 1: Planned vs Actual Interval */}
-            <div className="card">
-              <h3 className="font-display font-700 text-white mb-4 flex items-center gap-2">
-                <BarChart3 size={15} className="text-cyan-400" /> Planned vs Actual Interval (hrs)
-              </h3>
-              <ResponsiveContainer width="100%" height={220}>
-                <BarChart data={chartData} layout="vertical" margin={{ left: 8, right: 30 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1e3a5f" horizontal={false} />
-                  <XAxis type="number" stroke="#64748b" tick={{ fontSize: 10 }} />
-                  <YAxis type="category" dataKey="name" stroke="#64748b" tick={{ fontSize: 9 }} width={130} />
-                  <Tooltip
-                    contentStyle={{ background: '#0d1a2e', border: '1px solid rgba(0,212,255,0.2)', borderRadius: '8px', fontSize: '12px' }}
-                    formatter={(v, n) => [v.toLocaleString() + ' hrs', n]}
-                  />
-                  <Legend iconType="square" />
-                  <Bar dataKey="expected" name="Target Interval" fill="#334155" radius={[0, 2, 2, 0]} />
-                  <Bar dataKey="actual"   name="Avg Actual Interval" fill="#00d4ff" radius={[0, 2, 2, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-
-            {/* Chart 2: Compliance % */}
-            <div className="card">
-              <h3 className="font-display font-700 text-white mb-4 flex items-center gap-2">
-                <CheckCircle size={15} className="text-green-400" /> Compliance %
-              </h3>
-              <ResponsiveContainer width="100%" height={220}>
-                <BarChart data={chartData} layout="vertical" margin={{ left: 8, right: 40 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1e3a5f" horizontal={false} />
-                  <XAxis type="number" domain={[0, 150]} stroke="#64748b" tick={{ fontSize: 10 }} unit="%" />
-                  <YAxis type="category" dataKey="name" stroke="#64748b" tick={{ fontSize: 9 }} width={130} />
-                  <Tooltip contentStyle={{ background: '#0d1a2e', border: '1px solid rgba(0,212,255,0.2)', borderRadius: '8px', fontSize: '12px' }}
-                    formatter={v => [v + '%', 'Compliance']} />
-                  <ReferenceLine x={100} stroke="#00c853" strokeDasharray="4 2" label={{ value: '100%', fill: '#00c853', fontSize: 10 }} />
-                  <Bar dataKey="compliance" name="Compliance" radius={[0, 2, 2, 0]}>
-                    {chartData.map((entry, i) => (
-                      <Cell key={i} fill={COMPLIANCE_COLOR(entry.compliance)} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+          {/* ── Charts — full width, stacked, proper height ── */}
+          <div className="card">
+            <h3 className="font-display font-700 text-white mb-1 flex items-center gap-2">
+              <BarChart3 size={15} className="text-cyan-400" /> Planned vs Actual Interval (hrs)
+            </h3>
+            <p className="text-xs text-slate-500 mb-4 font-mono">
+              Grey = Target interval from PM plan &nbsp;|&nbsp; Cyan = Average actual interval between events
+            </p>
+            <IntervalChart data={chartData} />
           </div>
 
-          {/* ── Compliance Table ── */}
+          <div className="card">
+            <h3 className="font-display font-700 text-white mb-1 flex items-center gap-2">
+              <CheckCircle size={15} className="text-green-400" /> Compliance % per Task
+            </h3>
+            <p className="text-xs text-slate-500 mb-4 font-mono">
+              Green dashed line = 100% target &nbsp;|&nbsp; Red &lt;70% · Yellow 70–90% · Green ≥90%
+            </p>
+            <ComplianceChart data={chartData} />
+          </div>
+
+          {/* Compliance Table */}
           <div className="card p-0 overflow-hidden">
             <div className="px-5 py-4 border-b flex items-center justify-between"
               style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
@@ -1006,18 +1290,7 @@ export default function Maintenance() {
               <table className="w-full" style={{ minWidth: '900px' }}>
                 <thead>
                   <tr style={{ background: 'rgba(255,255,255,0.03)' }}>
-                    {[
-                      'PM Task',
-                      'Compliance',
-                      'Expected',
-                      'Actual',
-                      'Raw WOs',
-                      'Interval Ratio',
-                      'Recency Status',   // ✅ CHANGED from "Status"
-                      'Delay',
-                      'Total Cost',       // ✅ CHANGED from "Cost"
-                      '',
-                    ].map(h => (
+                    {['PM Task','Compliance','Expected','Actual','Raw WOs','Interval Ratio','Recency Status','Delay','Total Cost',''].map(h => (
                       <th key={h} className="px-4 py-3 text-left text-xs font-mono text-slate-500 font-500 uppercase tracking-wider">
                         {h}
                       </th>
@@ -1033,7 +1306,7 @@ export default function Maintenance() {
             </div>
           </div>
 
-          {/* ── Meta info ── */}
+          {/* Meta */}
           <div className="rounded-xl p-4 flex flex-wrap gap-6 text-xs font-mono"
             style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
             <span className="text-slate-500">Unit: <span className="text-slate-300">{results.unit_label}</span></span>
@@ -1042,11 +1315,10 @@ export default function Maintenance() {
             <span className="text-slate-500">Stages: <span className="text-yellow-400">{stages}</span></span>
             <span className="text-slate-500">WO file: <span className="text-slate-300">{results.wo_filename}</span></span>
             {results.analysis_id && (
-              <span className="text-slate-500">Analysis ID: <span className="text-slate-600">{results.analysis_id?.slice(0,8)}…</span></span>
+              <span className="text-slate-500">Analysis ID: <span className="text-slate-600">{results.analysis_id?.slice(0, 8)}…</span></span>
             )}
           </div>
 
-          {/* ── New Analysis ── */}
           <button onClick={() => { setStep(1); setResults(null); setWoFile(null) }}
             className="flex items-center gap-2 btn-ghost py-2.5 text-sm">
             <RefreshCw size={14} /> Run New Analysis
