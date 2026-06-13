@@ -46,7 +46,7 @@ const teamData = {
     name: 'Dr. Mirza Muhammad Ali Baig',
     role: 'Project Co-Supervisor',
     title: 'Assistant Professor',
-    dept: 'Department of Mechanical Engineering, NEDUET',
+    dept: 'Department of Electrical Engineering, NEDUET',
     color: '#00d4ff',
     photo: MirzaBaigPhoto,
   },
@@ -54,7 +54,7 @@ const teamData = {
     name: 'Mr. Basit Iqbal Khan',
     role: 'Industrial Advisor',
     title: 'Unit Manager',
-    dept: 'FPCL (Fauji Polymer Company Limited)',
+    dept: 'FPCL (FFBL Power Company Ltd.)',
     color: '#00c853',
     photo: BasitIqbalPhoto,
   },
@@ -63,15 +63,15 @@ const teamData = {
       name: 'Maaz Ahmed Siddiqui',
       seatNo: 'ME-22301',
       role: 'Group Lead · Research & Outreach',
-      sub: 'Industrial outreach lead · Report drafting & editing · Stakeholder communication · Literature review on compressor overview, import market & research gap · Contributed to both optimization frameworks & dashboard',
+      sub: 'Industrial Outreach lead · Report Drafting & Editing · Stakeholder Communication · Literature Review on Compressors, Import Market & Research Gap · Contributed to both Optimization Frameworks & Dashboard',
       color: '#facc15',
       photo: MaazAhmedPhoto,
     },
     {
       name: 'Ali Rashid',
       seatNo: 'ME-22032',
-      role: 'ML Framework Developer',
-      sub: 'Industrial outreach · Literature review on compressor operations · Developed ML framework for operational optimization · Operational optimization module of dashboard',
+      role: 'ML Framework Developer for Operations',
+      sub: 'Industrial Outreach · Literature Review related to Operations · Developed ML framework for Operational Optimization · Assisted in Operational Optimization Module of Dashboard',
       color: '#00d4ff',
       photo: AliRashidPhoto,
     },
@@ -79,7 +79,7 @@ const teamData = {
       name: 'Malik Muhammad Rafay',
       seatNo: 'ME-22022',
       role: 'Data Engineering & Maintenance',
-      sub: 'Industrial outreach · Literature review on maintenance strategies · Data cleaning & preprocessing · Maintenance compliance analysis framework · Maintenance module of dashboard',
+      sub: 'Industrial Outreach · Literature Review on Maintenance Strategies · Data Cleaning & Preprocessing · Maintenance Compliance Analysis Framework · Maintenance Module of Dashboard',
       color: '#a78bfa',
       photo: MalikMuhammadRafayPhoto,
     },
@@ -87,7 +87,7 @@ const teamData = {
       name: 'Muhammad Bilal Akber',
       seatNo: 'ME-22031',
       role: 'Lifecycle & Deployment',
-      sub: 'Industrial outreach · Studied preventive maintenance & OEM manuals · Literature review on lifecycle cost analysis & operational optimization · Dashboard development & deployment',
+      sub: 'Industrial Outreach · Studied Preventive Maintenance & OEM Manuals · Literature Review on Lifecycle Cost Analysis & Operational Optimization · Dashboard Development & Deployment',
       color: '#00c853',
       photo: MuhammadBilalAkberPhoto,
     },
@@ -98,7 +98,7 @@ const teamData = {
     role: 'Technical Contributor',
     title: 'Third-Year Student · CS & Information System Engineering',
     dept: 'NED University of Engineering & Technology',
-    contribution: 'Assisted in full-stack development (frontend, backend), database design, ML model selection, and hyperparameter tuning throughout the development and deployment of this project.',
+    contribution: 'Helped in full-stack development (frontend, backend), Database Design, ML Model Selection, and Hyperparameter Tuning throughout the development and deployment of this project.',
     color: '#f97316',
     photo: OmarRashidPhoto,
   },
@@ -215,7 +215,7 @@ function TeamModal({ onClose }) {
                 NED University of Engineering &amp; Technology, Karachi
               </div>
               <div className="text-slate-600 text-xs font-mono mt-0.5">
-                © 2024–2026 NEDUET · All Rights Reserved
+                © NEDUET · All Rights Reserved
               </div>
             </div>
           </div>
@@ -402,14 +402,14 @@ function TeamModal({ onClose }) {
             style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}
           >
             <p className="text-slate-500 text-xs font-mono">
-              All intellectual property rights of this project belong to
+              All Intellectual Property Rights of this Project belongs to
               <br />
               <span className="text-yellow-400 font-semibold">
                 NED University of Engineering &amp; Technology, Karachi
               </span>
             </p>
             <p className="text-slate-600 text-xs font-mono mt-1">
-              © 2024–2026 NEDUET · Unauthorized use or reproduction is strictly prohibited.
+              © NEDUET · Unauthorized Use or Reproduction is strictly prohibited.
             </p>
           </div>
 
@@ -649,7 +649,7 @@ export default function Landing() {
                 Designed Exclusively for <span className="text-cyan-400">Rotary Screw Compressors</span>
               </h3>
               <p className="text-slate-400 text-sm leading-relaxed">
-                CompressorAI is purpose-built for <strong className="text-white">two-stage Rotary Screw Air Compressors</strong> — 
+                CompressorAI is purpose-built for <strong className="text-white">multi-stage Rotary Screw Air Compressors</strong> — 
                 the most widely deployed type in industrial facilities. The ML pipeline, formulas, 
                 and optimization parameters are specifically calibrated for this compressor type. 
                 Results may not apply to reciprocating, centrifugal, or scroll compressors.
@@ -674,7 +674,7 @@ export default function Landing() {
               World-Class <span className="gradient-text-yellow">Features</span>
             </h2>
             <p className="text-slate-400 max-w-2xl mx-auto">
-              Everything your engineering team needs to optimize Rotary Screw Compressor performance and cut energy costs.
+              Everything your Engineering Team needs to optimize Rotary Screw Compressor Performance and cut Energy Costs.
             </p>
           </motion.div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -756,7 +756,7 @@ export default function Landing() {
                   Ready to <span className="gradient-text-yellow">Optimize?</span>
                 </h2>
                 <p className="text-slate-400 mb-8 text-lg">
-                  Join your team and start reducing energy costs with industrial-grade AI optimization.
+                  Join your team and start reducing energy costs with Industrial-Grade AI Optimization.
                 </p>
                 <div className="flex flex-wrap gap-4 justify-center">
                   <motion.button whileHover={{ scale:1.04 }} whileTap={{ scale:0.96 }}
@@ -805,7 +805,7 @@ export default function Landing() {
               <Zap className="w-4 h-4 text-yellow-400/50" />
               <span>CompressorAI © 2024–2026 — NEDUET Final Year Project</span>
             </div>
-            <span>DBSCAN + GBR + Differential Evolution · Rotary Screw Compressors Only</span>
+            <span>DBSCAN + GBR + GA · Rotary Screw Compressors Only</span>
           </div>
         </div>
       </footer>
