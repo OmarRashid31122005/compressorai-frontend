@@ -540,16 +540,18 @@ export default function Analysis() {
                   </div>
                 </div>
                 <div>
-                  <label className="label">Compression Stages (z)</label>
-                  <div className="flex gap-3">
-                    {[1,2,3].map(n => (
-                      <button key={n} type="button"
-                        onClick={() => setParams({...params, compression_stages:n})}
-                        className={`flex-1 py-2.5 rounded-xl border font-display font-600 text-sm transition-all ${
-                          params.compression_stages===n ? 'bg-cyan-400/15 border-cyan-400/40 text-cyan-400' : 'border-white/10 text-slate-400 hover:border-white/20'
-                        }`}>{n} Stage{n>1?'s':''}</button>
-                    ))}
+                  <label className="label">Number of Compression Stages</label>
+                  <div className="flex items-center gap-3">
+                    <button type="button"
+                      onClick={() => setParams({...params, compression_stages: Math.max(1, params.compression_stages - 1)})}
+                      className="w-9 h-9 rounded-lg border border-white/15 text-slate-300 hover:border-cyan-400/40 hover:text-cyan-400 transition-all flex items-center justify-center text-lg font-bold">−</button>
+                    <span className="font-display font-700 text-white text-xl w-6 text-center">{params.compression_stages}</span>
+                    <button type="button"
+                      onClick={() => setParams({...params, compression_stages: params.compression_stages + 1})}
+                      className="w-9 h-9 rounded-lg border border-white/15 text-slate-300 hover:border-cyan-400/40 hover:text-cyan-400 transition-all flex items-center justify-center text-lg font-bold">+</button>
+                    <span className="text-slate-500 text-sm font-mono">compression stages</span>
                   </div>
+                  <p className="text-xs text-slate-500 mt-2">Most industrial Rotary Screw Compressors = 2 stages</p>
                 </div>
               </div>
 
@@ -602,22 +604,6 @@ export default function Analysis() {
                       <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs font-mono">per kWh</span>
                     </div>
                     <p className="text-xs text-slate-600 mt-1">PKR, USD, or any currency</p>
-                  </div>
-
-                  {/* Operating days */}
-                  <div>
-                    <label className="label">Operating Days / Year</label>
-                    <div className="flex gap-2">
-                      {[365, 300, 250].map(d => (
-                        <button key={d} type="button"
-                          onClick={() => setUserParams(prev => ({ ...prev, operating_days: d }))}
-                          className={`flex-1 py-2.5 rounded-xl border font-display font-600 text-sm transition-all ${
-                            userParams.operating_days === d
-                              ? 'bg-green-400/15 border-green-400/40 text-green-400'
-                              : 'border-white/10 text-slate-400 hover:border-white/20'
-                          }`}>{d} days</button>
-                      ))}
-                    </div>
                   </div>
 
                   {/* Lifetime hours */}
