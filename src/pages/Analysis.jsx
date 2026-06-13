@@ -101,8 +101,6 @@ function DatasetPicker({ unitId, onSelect, onClose }) {
                 <div className="flex-1 min-w-0">
                   <div className="font-display font-600 text-white text-sm truncate">{ds.original_filename}</div>
                   <div className="flex items-center gap-3 mt-1 text-xs text-slate-500 font-mono">
-                    <span>{ds.clean_rows} rows</span>
-                    <span>·</span>
                     <span><Clock size={9} className="inline mr-0.5"/>{new Date(ds.created_at).toLocaleDateString()}</span>
                     {ds.contributed_to_model && <span className="text-green-400">· In ML model</span>}
                   </div>
@@ -223,10 +221,8 @@ export default function Analysis() {
   const downloadReport = async (type) => {
     if (!results) return
 
-    // Guard: warn if result_id is missing (path won't be saved to DB)
     if (!results.result_id) {
       toast.error('No analysis ID found — report will download but cannot be saved to history')
-      // Still proceed — download works even without DB path saving
     }
 
     try {
@@ -234,7 +230,7 @@ export default function Analysis() {
         compressor_id:    unitId,
         compressor_name:  unit?.unit_id || unitId,
         company_name:     unit?.location || 'Industrial Facility',
-        analysis_id:      results.result_id || null,   // ← saves path to DB
+        analysis_id:      results.result_id || null,
         analysis_results: {
           power_saving_percent:      results.power_saving_percent      || 0,
           best_electrical_power:     results.best_electrical_power     || 0,
@@ -265,7 +261,6 @@ export default function Analysis() {
       a.click()
       URL.revokeObjectURL(url)
 
-      // Confirm download + saved to history (only if result_id was present)
       if (results.result_id) {
         toast.success(`${type.toUpperCase()} downloaded & saved to Reports History ✓`)
       } else {
@@ -286,7 +281,7 @@ export default function Analysis() {
     } catch { toast.error('Download failed') }
   }
 
-  /* ✅ NEW: Copy optimal parameters to clipboard */
+  /* ✅ Copy optimal parameters to clipboard */
   const copyParameters = () => {
     if (!results?.optimal_parameters) return
     const lines = Object.entries(results.optimal_parameters)
@@ -416,7 +411,6 @@ export default function Analysis() {
                     <h2 className="font-display font-700 text-white text-xl">
                       {validation.is_valid ? 'Dataset Valid ✓' : 'Missing Required Columns'}
                     </h2>
-                    <p className="text-slate-400 text-sm">{validation.total_rows} rows × {validation.total_columns} columns</p>
                   </div>
                 </div>
 
@@ -509,7 +503,6 @@ export default function Analysis() {
                   <Database size={15} className="text-cyan-400 flex-shrink-0"/>
                   <div className="flex-1 min-w-0">
                     <div className="text-cyan-400 font-display font-600 text-sm truncate">{dataset.original_filename}</div>
-                    <div className="text-slate-500 text-xs font-mono">{dataset.clean_rows} clean rows ready</div>
                   </div>
                   <button onClick={() => downloadDataset('raw')}
                     className="p-1.5 text-slate-500 hover:text-cyan-400 transition-colors" title="Download raw">
@@ -716,7 +709,7 @@ export default function Analysis() {
             <div className="flex items-center justify-between flex-wrap gap-3">
               <div>
                 <h2 className="font-display font-800 text-2xl text-white">Analysis Results</h2>
-                <p className="text-slate-400 text-sm">{unit?.unit_id} — {results.cluster_stats?.total_points} data points analyzed</p>
+                <p className="text-slate-400 text-sm">{unit?.unit_id}</p>
               </div>
               <div className="flex gap-3 flex-wrap">
                 <button onClick={() => { setStep('upload'); setFile(null); setValidation(null); setDataset(null); setResults(null) }}
@@ -761,7 +754,7 @@ export default function Analysis() {
               ))}
             </div>
 
-            {/* Energy & Cost Savings Card — always visible when saving > 0 */}
+            {/* Energy & Cost Savings Card */}
             {(results.kw_saved > 0 || results.power_saving_percent > 0) && (
               <div className="card" style={{background:'linear-gradient(135deg,rgba(21,128,61,0.1),rgba(0,212,255,0.05))',border:'1px solid rgba(21,128,61,0.25)'}}>
                 <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
@@ -930,7 +923,7 @@ export default function Analysis() {
               </div>
             </div>
 
-            {/* ✅ IMPROVED: Optimal Parameters with Copy button */}
+            {/* Optimal Parameters */}
             <div className="card">
               <div className="flex items-center justify-between mb-2">
                 <h3 className="font-display font-700 text-white text-xl">🎯 Optimal Operating Parameters</h3>
@@ -956,6 +949,36 @@ export default function Analysis() {
                     <div className="text-xs text-slate-500 font-mono">Range: {vals.min?.toFixed(3)} – {vals.max?.toFixed(3)}</div>
                   </div>
                 ))}
+
+                {/* Calculated Current Card — I = P_elec*1000 / (√3 × V × cosφ) */}
+                {(() => {
+                  const V    = userParams.voltage      || 415
+                  const cosF = userParams.power_factor || 0.9
+                  const Pe   = results.best_electrical_power
+                  if (!Pe || !V || !cosF) return null
+                  const I_opt = (Pe * 1000) / (Math.sqrt(3) * V * cosF)
+                  const Pe_base = results.baseline_electrical_power
+                  const I_base  = Pe_base ? (Pe_base * 1000) / (Math.sqrt(3) * V * cosF) : null
+                  return (
+                    <div className="bg-primary-800/50 rounded-xl p-4 border border-yellow-400/20 hover:border-yellow-400/40 transition-colors">
+                      <div className="text-xs text-slate-400 font-mono mb-2 leading-tight flex items-center gap-1.5">
+                        Current (Amp)
+                        <span className="text-yellow-400/60 text-[9px]">calculated</span>
+                      </div>
+                      <div className="font-display font-800 text-2xl text-yellow-400 mb-1">
+                        {I_opt.toFixed(3)}<span className="text-sm text-slate-400 ml-1">A</span>
+                      </div>
+                      {I_base && (
+                        <div className="text-xs text-slate-500 font-mono">
+                          Baseline: {I_base.toFixed(3)} A
+                        </div>
+                      )}
+                      <div className="text-[10px] text-slate-600 font-mono mt-1">
+                        I = P×1000 / (√3·V·cosφ)
+                      </div>
+                    </div>
+                  )
+                })()}
               </div>
             </div>
           </motion.div>
