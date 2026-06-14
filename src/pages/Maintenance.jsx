@@ -279,6 +279,15 @@ function MaintenanceTutorial({ onClose }) {
 // ── Print Report ───────────────────────────────────────────────
 function printReport({ results, stages, unit }) {
   if (!results) return
+
+  const seen = new Set()
+  const uniqueResults = (results.results || []).filter(row => {
+    const key = `${row.task}_${row.interval_hours}`
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+
   const s = results.summary || {}
   const now = new Date().toLocaleString('en-PK', { timeZone: 'Asia/Karachi', dateStyle: 'long', timeStyle: 'short' })
 
@@ -291,7 +300,7 @@ function printReport({ results, stages, unit }) {
   const INTERVAL_STYLE = (r) =>
     r === 'On Track' ? 'color:#006400' : r === 'Over-maintained' ? 'color:#0c6478' : r === 'Never Performed' ? 'color:#842029' : 'color:#842029'
 
-  const taskRows = (results.results || []).map(row => `
+  const taskRows = uniqueResults.map(row => `
     <tr>
       <td>${row.task}<br/><small style="color:#666">Every ${row.interval_hours?.toLocaleString()} hrs</small></td>
       <td style="text-align:center;${COMPLIANCE_STYLE(row.compliance_pct)}">${row.compliance_pct}%</td>
@@ -305,7 +314,7 @@ function printReport({ results, stages, unit }) {
     </tr>
   `).join('')
 
-  const eventSections = (results.results || []).map(row => {
+  const eventSections = uniqueResults.map(row => {
     if (!row.events?.length) return ''
     const evRows = row.events.map(ev => `
       <tr>
@@ -914,7 +923,14 @@ export default function Maintenance() {
   }
 
   // Chart data — use fullName (no truncation) for Y-axis
-  const chartData = results?.results?.map(r => ({
+  const seenChart = new Set()
+  const uniqueChartResults = (results?.results || []).filter(r => {
+    const k = `${r.task}_${r.interval_hours}`
+    if (seenChart.has(k)) return false
+    seenChart.add(k)
+    return true
+  })
+  const chartData = uniqueChartResults.map(r => ({
     name:       r.task.length > 28 ? r.task.slice(0, 26) + '…' : r.task,
     fullName:   r.task,
     expected:   r.interval_hours,
@@ -1298,7 +1314,9 @@ export default function Maintenance() {
                   </tr>
                 </thead>
                 <tbody>
-                  {results.results?.map((row, i) => (
+                  {(results.results || []).filter((row, i, arr) =>
+                    arr.findIndex(r => r.task === row.task && r.interval_hours === row.interval_hours) === i
+                  ).map((row, i) => (
                     <ComplianceRow key={i} row={row} i={i} />
                   ))}
                 </tbody>
