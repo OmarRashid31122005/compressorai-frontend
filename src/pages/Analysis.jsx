@@ -961,9 +961,8 @@ export default function Analysis() {
                   const I_base  = Pe_base ? (Pe_base * 1000) / (Math.sqrt(3) * V * cosF) : null
                   return (
                     <div className="bg-primary-800/50 rounded-xl p-4 border border-yellow-400/20 hover:border-yellow-400/40 transition-colors">
-                      <div className="text-xs text-slate-400 font-mono mb-2 leading-tight flex items-center gap-1.5">
+                      <div className="text-xs text-slate-400 font-mono mb-2 leading-tight">
                         Current (Amp)
-                        <span className="text-yellow-400/60 text-[9px]">calculated</span>
                       </div>
                       <div className="font-display font-800 text-2xl text-yellow-400 mb-1">
                         {I_opt.toFixed(3)}<span className="text-sm text-slate-400 ml-1">A</span>
