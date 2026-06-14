@@ -748,10 +748,10 @@ export default function Analysis() {
             {/* Key Results */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               {[
-                { label:'Best Electrical Power', value:results.best_electrical_power?.toFixed(2), unit:'kW',        color:'text-cyan-400',   bg:'bg-cyan-400/10'   },
-                { label:'Best Mechanical Power', value:results.best_mechanical_power?.toFixed(2),  unit:'kW',        color:'text-blue-400',   bg:'bg-blue-400/10'   },
-                { label:'Energy Saving',         value:results.power_saving_percent?.toFixed(2),   unit:'%',         color:'text-green-400',  bg:'bg-green-400/10'  },
-                { label:'Best SPC',              value:results.best_spc?.toFixed(4),               unit:'kW/m³/min', color:'text-orange-400', bg:'bg-orange-400/10' },
+                { label:'Best Electrical Power', value:results.best_electrical_power?.toFixed(2), unit:'kWh',       color:'text-cyan-400',   bg:'bg-cyan-400/10'   },
+                { label:'Best Mechanical Power', value:results.best_mechanical_power?.toFixed(2), unit:'kWh',       color:'text-blue-400',   bg:'bg-blue-400/10'   },
+                { label:'Energy Saving',         value:results.power_saving_percent?.toFixed(2),  unit:'%',         color:'text-green-400',  bg:'bg-green-400/10'  },
+                { label:'Best SPC',              value:results.best_spc?.toFixed(4),              unit:'kW/m³/min', color:'text-orange-400', bg:'bg-orange-400/10' },
               ].map(({ label, value, unit, color, bg }) => (
                 <div key={label} className="card">
                   <div className="text-slate-400 text-xs font-mono mb-2">{label}</div>
@@ -800,7 +800,7 @@ export default function Analysis() {
                   </div>
                 </div>
                 <div className="mt-3 pt-3 border-t border-white/8 text-xs text-slate-500 font-mono flex flex-wrap gap-3">
-                  <span>Baseline: {results.baseline_electrical_power} kW → Optimal: {results.best_electrical_power} kW</span>
+                  <span>Baseline: {results.baseline_electrical_power} kWh → Optimal: {results.best_electrical_power} kWh</span>
                   <span>· {results.hours_per_day || params.hours_per_day || 24}h/day · {results.operating_days || params.operating_days || 365} days/yr</span>
                   {(results.cost_per_kwh > 0 || params.cost_per_kwh > 0) && <span>· Tariff: {results.cost_per_kwh || params.cost_per_kwh}/kWh</span>}
                 </div>
@@ -817,7 +817,7 @@ export default function Analysis() {
                 ]}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#1e3a5f" />
                   <XAxis dataKey="name" stroke="#64748b" tick={{fontSize:12}} />
-                  <YAxis stroke="#64748b" tick={{fontSize:11}} label={{value:'kW',angle:-90,position:'insideLeft',fill:'#64748b',fontSize:11}} />
+                  <YAxis stroke="#64748b" tick={{fontSize:11}} label={{value:'kWh',angle:-90,position:'insideLeft',fill:'#64748b',fontSize:11}} />
                   <Tooltip content={<CustomTooltip/>} />
                   <Bar dataKey="power" radius={[6,6,0,0]}>
                     {[{fill:'#475569'},{fill:CYAN}].map((entry, i) => <Cell key={i} fill={entry.fill} />)}
