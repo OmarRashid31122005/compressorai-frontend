@@ -297,25 +297,143 @@ function MaintenanceTutorial({ onClose }) {
   )
 }
 
-// ── Print Report ───────────────────────────────────────────────
+// ── Print Report (UPDATED v6.1 — with full interpretation) ────────────────
 function printReport({ results, stages, unit }) {
   if (!results) return
   const s = results.summary || {}
-  const now = new Date().toLocaleString('en-PK', { timeZone: 'Asia/Karachi', dateStyle: 'long', timeStyle: 'short' })
+  const now = new Date().toLocaleString('en-PK', {
+    timeZone: 'Asia/Karachi', dateStyle: 'long', timeStyle: 'short'
+  })
 
-  // ── De-duplicate PM task rows (by task name) — prevents the
-  // compliance table and work-order event sections from
-  // repeating the same task twice in the printed report.
   const dedupedResults = dedupeResults(results.results)
 
+  // ── Interpretation Helpers ─────────────────────────────────────────────
+
   const COMPLIANCE_STYLE = (v) =>
-    v >= 90 ? 'color:#006400;font-weight:700' : v >= 70 ? 'color:#856404;font-weight:700' : 'color:#842029;font-weight:700'
+    v >= 90 ? 'color:#006400;font-weight:700'
+    : v >= 70 ? 'color:#856404;font-weight:700'
+    : 'color:#842029;font-weight:700'
 
   const RECENCY_STYLE = (r) =>
     r === 'OK' ? 'color:#006400' : r === 'Due Soon' ? 'color:#856404' : 'color:#842029'
 
   const INTERVAL_STYLE = (r) =>
-    r === 'On Track' ? 'color:#006400' : r === 'Over-maintained' ? 'color:#0c6478' : r === 'Never Performed' ? 'color:#842029' : 'color:#842029'
+    r === 'On Track' ? 'color:#006400'
+    : r === 'Over-maintained' || r === 'Over' ? 'color:#0c6478'
+    : r === 'Never Performed' || r === 'Under' ? 'color:#842029'
+    : 'color:#842029'
+
+  // ── Overall Health Assessment ──────────────────────────────────────────
+  function getOverallHealth(avgCompliance, overdueCount, neverDoneCount, total) {
+    if (avgCompliance >= 90 && overdueCount === 0)
+      return { label: 'EXCELLENT', color: '#006400', bg: '#f0fff4',
+        desc: 'PM program is well-managed. All tasks are being performed on schedule with high compliance.' }
+    if (avgCompliance >= 75 && overdueCount <= 2)
+      return { label: 'GOOD', color: '#1a6b2a', bg: '#f0fff4',
+        desc: 'PM program is generally on track with minor deviations. Some tasks require attention.' }
+    if (avgCompliance >= 60 || overdueCount <= Math.floor(total * 0.3))
+      return { label: 'NEEDS ATTENTION', color: '#856404', bg: '#fffbeb',
+        desc: 'Several PM tasks are overdue or not being performed at the planned frequency. Immediate review recommended.' }
+    return { label: 'CRITICAL', color: '#842029', bg: '#fff5f5',
+      desc: 'PM program has significant gaps. Multiple overdue tasks and missed maintenance events indicate high equipment risk.' }
+  }
+
+  // ── Per-task Interpretation ────────────────────────────────────────────
+  function interpretTask(row) {
+    const lines = []
+
+    // Compliance interpretation
+    if (row.compliance_pct >= 110) {
+      lines.push(`<b>Over-maintained:</b> This task was performed ${row.actual_pm} times vs ${row.expected_pm} expected — maintenance is occurring too frequently, adding unnecessary cost.`)
+    } else if (row.compliance_pct >= 90) {
+      lines.push(`<b>On schedule:</b> Performed ${row.actual_pm} out of ${row.expected_pm} expected times — excellent compliance.`)
+    } else if (row.compliance_pct >= 70) {
+      lines.push(`<b>Slightly under-maintained:</b> Performed ${row.actual_pm} out of ${row.expected_pm} expected times — ${row.expected_pm - row.actual_pm} event(s) missed.`)
+    } else if (row.compliance_pct > 0) {
+      lines.push(`<b>Significantly under-maintained:</b> Only ${row.actual_pm} out of ${row.expected_pm} required events performed — ${row.expected_pm - row.actual_pm} missed events represent a serious gap.`)
+    } else {
+      lines.push(`<b>Never performed:</b> This task has not been recorded in the work order system despite being required every ${row.interval_hours?.toLocaleString()} hrs.`)
+    }
+
+    // Interval ratio interpretation
+    if (row.interval_ratio !== null && row.interval_ratio !== undefined) {
+      if (row.interval_ratio < 0.85) {
+        lines.push(`<b>Interval too short (${row.interval_ratio}x):</b> Average actual interval (${row.avg_interval?.toLocaleString()} hrs) is well below the target (${row.interval_hours?.toLocaleString()} hrs) — maintenance is being triggered too early.`)
+      } else if (row.interval_ratio > 1.15) {
+        lines.push(`<b>Interval too long (${row.interval_ratio}x):</b> Average actual interval (${row.avg_interval?.toLocaleString()} hrs) exceeds target (${row.interval_hours?.toLocaleString()} hrs) — tasks are being delayed beyond safe limits.`)
+      } else {
+        lines.push(`<b>Interval on target (${row.interval_ratio}x):</b> Average actual interval closely matches the PM plan target of ${row.interval_hours?.toLocaleString()} hrs.`)
+      }
+    }
+
+    // Recency / overdue interpretation
+    if (row.recency_status === 'Overdue') {
+      lines.push(`<b>⚠ OVERDUE:</b> The last maintenance event was ${row.last_interval?.toLocaleString()} hrs ago — ${row.delay_hours?.toLocaleString()} hrs past the required interval of ${row.interval_hours?.toLocaleString()} hrs. Immediate action required.`)
+    } else if (row.recency_status === 'Due Soon') {
+      lines.push(`<b>Due soon:</b> Last event was ${row.last_interval?.toLocaleString()} hrs ago — approaching the ${row.interval_hours?.toLocaleString()} hr interval. Schedule maintenance promptly.`)
+    } else if (row.recency_status === 'OK') {
+      lines.push(`<b>Recency OK:</b> Last performed ${row.last_interval?.toLocaleString()} hrs ago — within the safe window of ${row.interval_hours?.toLocaleString()} hrs.`)
+    }
+
+    // Cost interpretation
+    if (row.over_maintenance > 0 && row.over_maint_cost > 0) {
+      lines.push(`<b>Over-maintenance cost:</b> PKR ${row.over_maint_cost?.toLocaleString()} was spent on ${row.over_maintenance} unnecessary maintenance event(s) beyond what the PM plan requires.`)
+    }
+
+    return lines.map(l => `<li style="margin-bottom:4px">${l}</li>`).join('')
+  }
+
+  // ── Key Findings & Recommendations ────────────────────────────────────
+  function buildFindings(results, summary) {
+    const findings = []
+    const actions  = []
+
+    const overdue       = results.filter(r => r.recency_status === 'Overdue')
+    const neverDone     = results.filter(r => r.actual_pm === 0)
+    const overMaint     = results.filter(r => r.interval_status === 'Over' || r.interval_status === 'Over-maintained')
+    const underMaint    = results.filter(r => r.interval_status === 'Under' || r.interval_status === 'Under-maintained')
+    const highCost      = [...results].filter(r => r.total_cost > 0).sort((a,b) => b.total_cost - a.total_cost).slice(0, 3)
+
+    if (overdue.length > 0) {
+      findings.push(`<b>${overdue.length} task(s) are currently OVERDUE</b> — ${overdue.map(r => `"${r.task}" (+${r.delay_hours?.toLocaleString()} hrs past due)`).join('; ')}.`)
+      actions.push(`Immediately schedule and execute the following overdue tasks: <b>${overdue.map(r => r.task).join(', ')}</b>. Each additional hour of delay increases equipment wear and failure risk.`)
+    }
+
+    if (neverDone.length > 0) {
+      findings.push(`<b>${neverDone.length} task(s) have NEVER been recorded</b> in the work order system: ${neverDone.map(r => `"${r.task}"`).join(', ')}.`)
+      actions.push(`Verify whether "${neverDone.map(r => r.task).join('", "')}" have been performed manually without SAP logging, or if they have been genuinely omitted. If omitted, schedule immediately.`)
+    }
+
+    if (overMaint.length > 0) {
+      findings.push(`<b>${overMaint.length} task(s) are being over-maintained</b> (performed more frequently than required): ${overMaint.map(r => `"${r.task}" at ${r.interval_ratio}x frequency`).join('; ')}.`)
+      actions.push(`Review scheduling triggers for over-maintained tasks. Aligning to PM plan intervals could save an estimated <b>PKR ${summary.over_maint_cost?.toLocaleString()}</b> per cycle.`)
+    }
+
+    if (underMaint.length > 0) {
+      findings.push(`<b>${underMaint.length} task(s) are under-maintained</b> (performed less frequently than required): ${underMaint.map(r => `"${r.task}" at ${r.interval_ratio}x`).join('; ')}.`)
+      actions.push(`Increase maintenance frequency for under-maintained tasks to meet PM plan requirements and prevent premature equipment failure.`)
+    }
+
+    if (summary.avg_compliance_pct > 100) {
+      findings.push(`<b>Overall compliance of ${summary.avg_compliance_pct}% exceeds 100%</b> — the fleet is being maintained more aggressively than the PM plan specifies, resulting in higher costs without proportional reliability benefit.`)
+    }
+
+    if (highCost.length > 0) {
+      findings.push(`<b>Top cost-generating tasks:</b> ${highCost.map(r => `"${r.task}" (PKR ${r.total_cost?.toLocaleString()})`).join('; ')}.`)
+    }
+
+    return { findings, actions }
+  }
+
+  // ── Build HTML ─────────────────────────────────────────────────────────
+  const health = getOverallHealth(
+    s.avg_compliance_pct,
+    s.overdue_count,
+    s.tasks_never_done,
+    s.total_tasks
+  )
+
+  const { findings, actions } = buildFindings(dedupedResults, s)
 
   const taskRows = dedupedResults.map(row => `
     <tr>
@@ -324,11 +442,29 @@ function printReport({ results, stages, unit }) {
       <td style="text-align:center">${row.expected_pm}</td>
       <td style="text-align:center">${row.actual_pm}</td>
       <td style="text-align:center;color:#666">${row.raw_wo_count ?? row.actual_pm}</td>
-      <td style="text-align:center;${INTERVAL_STYLE(row.interval_status)}">${row.interval_ratio != null ? row.interval_ratio + 'x' : '—'}<br/><small>${row.interval_status}</small></td>
+      <td style="text-align:center;${INTERVAL_STYLE(row.interval_status)}">
+        ${row.interval_ratio != null ? row.interval_ratio + 'x' : '—'}<br/>
+        <small>${row.interval_status}</small>
+      </td>
       <td style="text-align:center;${RECENCY_STYLE(row.recency_status)}">${row.recency_status}</td>
-      <td style="text-align:center;color:${row.delay_hours > 0 ? '#842029' : '#666'}">${row.delay_hours > 0 ? '+' + row.delay_hours?.toLocaleString() + ' hrs' : '—'}</td>
+      <td style="text-align:center;color:${row.delay_hours > 0 ? '#842029' : '#666'}">
+        ${row.delay_hours > 0 ? '+' + row.delay_hours?.toLocaleString() + ' hrs' : '—'}
+      </td>
       <td style="text-align:center">${row.total_cost > 0 ? 'PKR ' + row.total_cost?.toLocaleString() : '—'}</td>
     </tr>
+  `).join('')
+
+  const interpretationRows = dedupedResults.map(row => `
+    <div class="interp-block">
+      <div class="interp-header">
+        <span class="interp-task">${row.task}</span>
+        <span class="interp-meta">Every ${row.interval_hours?.toLocaleString()} hrs &nbsp;|&nbsp;
+          <span style="${COMPLIANCE_STYLE(row.compliance_pct)}">${row.compliance_pct}% Compliance</span> &nbsp;|&nbsp;
+          <span style="${RECENCY_STYLE(row.recency_status)}">${row.recency_status}</span>
+        </span>
+      </div>
+      <ul class="interp-list">${interpretTask(row)}</ul>
+    </div>
   `).join('')
 
   const eventSections = dedupedResults.map(row => {
@@ -339,13 +475,21 @@ function printReport({ results, stages, unit }) {
         <td>${ev.date}</td>
         <td>${ev.description}</td>
         <td style="text-align:right">${ev.cost > 0 ? 'PKR ' + ev.cost?.toLocaleString() : '—'}</td>
+        ${ev.wo_count > 1 ? `<td style="text-align:center;color:#856404">${ev.wo_count} WOs</td>` : '<td>—</td>'}
       </tr>
     `).join('')
     return `
       <div class="event-block">
-        <h4>${row.task} <span style="font-weight:400;color:#555">— Every ${row.interval_hours?.toLocaleString()} hrs</span></h4>
+        <h4>${row.task}
+          <span style="font-weight:400;color:#555">— Every ${row.interval_hours?.toLocaleString()} hrs</span>
+        </h4>
         <table>
-          <thead><tr><th>Running Hours</th><th>Date</th><th>Description</th><th style="text-align:right">Cost (PKR)</th></tr></thead>
+          <thead>
+            <tr>
+              <th>Running Hours</th><th>Date</th><th>Description</th>
+              <th style="text-align:right">Cost (PKR)</th><th style="text-align:center">WO Count</th>
+            </tr>
+          </thead>
           <tbody>${evRows}</tbody>
         </table>
       </div>
@@ -358,101 +502,133 @@ function printReport({ results, stages, unit }) {
   <meta charset="UTF-8"/>
   <title>PM Compliance Report — ${results.unit_label || unit?.unit_id || ''}</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 11px; color: #1a1a2e; background: #fff; }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { font-family:'Segoe UI',Arial,sans-serif; font-size:11px; color:#1a1a2e; background:#fff; }
 
-    /* ── Cover Header ── */
+    /* ── Cover ── */
     .cover {
-      background: linear-gradient(135deg, #0a1628 0%, #0d2040 100%);
-      color: white; padding: 36px 48px; margin-bottom: 0;
-      display: flex; align-items: center; justify-content: space-between;
+      background:linear-gradient(135deg,#0a1628 0%,#0d2040 100%);
+      color:white; padding:36px 48px;
+      display:flex; align-items:center; justify-content:space-between;
     }
-    .cover-left h1 { font-size: 22px; font-weight: 800; letter-spacing: -0.5px; }
-    .cover-left h1 span { color: #00d4ff; }
-    .cover-left p { color: #94a3b8; font-size: 11px; margin-top: 4px; }
-    .cover-right { text-align: right; }
-    .cover-right .unit { font-size: 20px; font-weight: 700; color: #facc15; }
-    .cover-right .meta { color: #64748b; font-size: 10px; margin-top: 4px; line-height: 1.6; }
+    .cover-left h1 { font-size:22px; font-weight:800; letter-spacing:-0.5px; }
+    .cover-left h1 span { color:#00d4ff; }
+    .cover-left p { color:#94a3b8; font-size:11px; margin-top:4px; }
+    .cover-right { text-align:right; }
+    .cover-right .unit { font-size:20px; font-weight:700; color:#facc15; }
+    .cover-right .meta { color:#64748b; font-size:10px; margin-top:4px; line-height:1.6; }
 
     /* ── Section headers ── */
     .section-title {
-      font-size: 12px; font-weight: 700; text-transform: uppercase;
-      letter-spacing: 1px; color: #0a1628;
-      border-bottom: 2px solid #0a1628; padding-bottom: 5px;
-      margin: 24px 0 12px;
+      font-size:12px; font-weight:700; text-transform:uppercase;
+      letter-spacing:1px; color:#0a1628;
+      border-bottom:2px solid #0a1628; padding-bottom:5px;
+      margin:28px 0 14px;
     }
+
+    /* ── Overall Health Banner ── */
+    .health-banner {
+      border-radius:8px; padding:16px 20px; margin-bottom:20px;
+      display:flex; align-items:flex-start; gap:16px;
+    }
+    .health-label {
+      font-size:18px; font-weight:900; letter-spacing:1px;
+      white-space:nowrap; padding-top:2px;
+    }
+    .health-desc { font-size:11px; line-height:1.7; }
 
     /* ── KPI Strip ── */
     .kpi-strip {
-      display: grid; grid-template-columns: repeat(6, 1fr);
-      gap: 0; border: 1px solid #dde1e7; border-radius: 8px;
-      overflow: hidden; margin-bottom: 20px;
+      display:grid; grid-template-columns:repeat(6,1fr);
+      border:1px solid #dde1e7; border-radius:8px;
+      overflow:hidden; margin-bottom:20px;
     }
-    .kpi { padding: 14px 12px; text-align: center; border-right: 1px solid #dde1e7; }
-    .kpi:last-child { border-right: none; }
-    .kpi .val { font-size: 22px; font-weight: 800; }
-    .kpi .lbl { font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b; margin-top: 3px; }
+    .kpi { padding:14px 10px; text-align:center; border-right:1px solid #dde1e7; }
+    .kpi:last-child { border-right:none; }
+    .kpi .val { font-size:22px; font-weight:800; }
+    .kpi .lbl { font-size:9px; text-transform:uppercase; letter-spacing:0.5px; color:#64748b; margin-top:3px; }
 
-    /* ── Over-maint alert ── */
+    /* ── Alert box ── */
     .alert-box {
-      border: 1px solid #f5c2c7; background: #fff5f5;
-      border-radius: 6px; padding: 10px 14px; margin-bottom: 20px;
-      font-size: 11px; color: #842029;
+      border:1px solid #f5c2c7; background:#fff5f5;
+      border-radius:6px; padding:10px 14px; margin-bottom:20px;
+      font-size:11px; color:#842029;
     }
-    .alert-box strong { color: #6b0011; }
 
-    /* ── Params table ── */
-    .params-grid {
-      display: grid; grid-template-columns: 1fr 1fr;
-      gap: 6px; margin-bottom: 20px;
+    /* ── Findings ── */
+    .findings-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px; }
+    .findings-box {
+      border-radius:6px; padding:12px 14px;
     }
+    .findings-box h4 { font-size:10px; text-transform:uppercase; letter-spacing:0.8px; margin-bottom:8px; }
+    .findings-box ul { padding-left:14px; }
+    .findings-box li { font-size:10px; line-height:1.7; margin-bottom:4px; color:#333; }
+
+    /* ── Params ── */
+    .params-grid { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-bottom:20px; }
     .param-row {
-      display: flex; justify-content: space-between;
-      border-bottom: 1px solid #f0f0f0; padding: 5px 0;
-      font-size: 10px;
+      display:flex; justify-content:space-between;
+      border-bottom:1px solid #f0f0f0; padding:5px 0; font-size:10px;
     }
-    .param-row .pk { color: #555; }
-    .param-row .pv { font-weight: 600; color: #0a1628; }
+    .param-row .pk { color:#555; }
+    .param-row .pv { font-weight:600; color:#0a1628; }
 
     /* ── Tables ── */
-    table { width: 100%; border-collapse: collapse; font-size: 10px; }
+    table { width:100%; border-collapse:collapse; font-size:10px; }
     th {
-      background: #0a1628; color: white; padding: 7px 8px;
-      text-align: left; font-weight: 600; font-size: 9px;
-      text-transform: uppercase; letter-spacing: 0.5px;
+      background:#0a1628; color:white; padding:7px 8px;
+      text-align:left; font-weight:600; font-size:9px;
+      text-transform:uppercase; letter-spacing:0.5px;
     }
-    td { padding: 7px 8px; border-bottom: 1px solid #e8eaf0; vertical-align: top; }
-    tr:nth-child(even) td { background: #f8f9fb; }
-    tr:last-child td { border-bottom: none; }
+    td { padding:7px 8px; border-bottom:1px solid #e8eaf0; vertical-align:top; }
+    tr:nth-child(even) td { background:#f8f9fb; }
+    tr:last-child td { border-bottom:none; }
 
-    /* ── Event detail blocks ── */
-    .event-block { margin-bottom: 18px; break-inside: avoid; }
+    /* ── Per-task Interpretation ── */
+    .interp-block {
+      margin-bottom:14px; padding:12px 14px;
+      border-radius:6px; break-inside:avoid;
+      background:#fafbfd; border:1px solid #e8eaf0;
+      border-left:3px solid #0a1628;
+    }
+    .interp-header {
+      display:flex; align-items:baseline; justify-content:space-between;
+      flex-wrap:wrap; gap:6px; margin-bottom:8px;
+    }
+    .interp-task { font-weight:700; font-size:11px; color:#0a1628; }
+    .interp-meta { font-size:9px; color:#64748b; font-family:monospace; }
+    .interp-list { padding-left:16px; }
+    .interp-list li { font-size:10px; line-height:1.7; color:#333; margin-bottom:3px; }
+
+    /* ── Event blocks ── */
+    .event-block { margin-bottom:18px; break-inside:avoid; }
     .event-block h4 {
-      font-size: 11px; font-weight: 700; color: #0a1628;
-      background: #f0f4ff; padding: 7px 10px;
-      border-left: 3px solid #00d4ff; margin-bottom: 6px;
+      font-size:11px; font-weight:700; color:#0a1628;
+      background:#f0f4ff; padding:7px 10px;
+      border-left:3px solid #00d4ff; margin-bottom:6px;
     }
 
     /* ── Footer ── */
     .footer {
-      text-align: center; font-size: 9px; color: #94a3b8;
-      border-top: 1px solid #e8eaf0; padding: 10px 0;
-      margin-top: 24px;
+      text-align:center; font-size:9px; color:#94a3b8;
+      border-top:1px solid #e8eaf0; padding:10px 0; margin-top:24px;
     }
 
-    /* ── Body padding ── */
-    .body-wrap { padding: 20px 40px; }
+    .body-wrap { padding:20px 40px; }
+
+    /* ── Page break hints ── */
+    .pb-before { page-break-before:always; }
 
     @media print {
-      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-      .section-title { break-before: auto; }
-      .event-block { break-inside: avoid; }
+      body { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+      .interp-block { break-inside:avoid; }
+      .event-block  { break-inside:avoid; }
     }
   </style>
 </head>
 <body>
 
-<!-- Cover -->
+<!-- ══ COVER ══════════════════════════════════════════════════ -->
 <div class="cover">
   <div class="cover-left">
     <h1>Compressor<span>AI</span> — PM Compliance Report</h1>
@@ -470,11 +646,33 @@ function printReport({ results, stages, unit }) {
 
 <div class="body-wrap">
 
+  <!-- ══ 1. EXECUTIVE SUMMARY ══════════════════════════════════ -->
+  <div class="section-title">1. Executive Summary</div>
+
+  <!-- Health Banner -->
+  <div class="health-banner" style="background:${health.bg};border:1.5px solid ${health.color}30;">
+    <div class="health-label" style="color:${health.color}">● ${health.label}</div>
+    <div class="health-desc">
+      <b>Overall PM Health Assessment for ${results.unit_label || '—'}:</b><br/>
+      ${health.desc}<br/>
+      <span style="color:#555">
+        Average compliance across all ${dedupedResults.length} tasks is
+        <b>${s.avg_compliance_pct}%</b> over
+        <b>${s.total_hours_analyzed?.toLocaleString()} operating hours</b>.
+        ${s.overdue_count > 0
+          ? `<b style="color:#842029">${s.overdue_count} task(s) are currently overdue</b> and require immediate attention.`
+          : 'No tasks are currently overdue.'}
+        ${s.over_maint_cost > 0
+          ? ` Over-maintenance has resulted in an estimated cost of <b>PKR ${s.over_maint_cost?.toLocaleString()}</b>.`
+          : ''}
+      </span>
+    </div>
+  </div>
+
   <!-- KPI Strip -->
-  <div class="section-title">Analysis Summary</div>
   <div class="kpi-strip">
     <div class="kpi">
-      <div class="val" style="color:#006400">${s.avg_compliance_pct ?? '—'}%</div>
+      <div class="val" style="color:${s.avg_compliance_pct >= 90 ? '#006400' : s.avg_compliance_pct >= 70 ? '#856404' : '#842029'}">${s.avg_compliance_pct ?? '—'}%</div>
       <div class="lbl">Avg Compliance</div>
     </div>
     <div class="kpi">
@@ -499,31 +697,58 @@ function printReport({ results, stages, unit }) {
     </div>
   </div>
 
-  <!-- Over-maint cost alert -->
+  <!-- Over-maint alert -->
   ${s.over_maint_cost > 0 ? `
   <div class="alert-box">
-    ⚠️ <strong>Over-maintenance Cost: PKR ${s.over_maint_cost?.toLocaleString()}</strong>
-    — expenditure incurred from performing maintenance more frequently than required by the PM plan.
+    ⚠️ <b>Over-maintenance Cost: PKR ${s.over_maint_cost?.toLocaleString()}</b>
+    — This is expenditure incurred by performing maintenance tasks more frequently than the PM plan requires.
+    Aligning maintenance schedules to plan intervals would recover this cost in future cycles.
   </div>` : ''}
 
-  <!-- Operating Parameters -->
-  <div class="section-title">Operating Parameters</div>
+  <!-- ══ 2. KEY FINDINGS & RECOMMENDATIONS ══════════════════════ -->
+  <div class="section-title">2. Key Findings &amp; Recommendations</div>
+  <div class="findings-grid">
+    <div class="findings-box" style="background:#fff5f5;border:1px solid #f5c2c7;">
+      <h4 style="color:#842029">⚠ Key Findings</h4>
+      <ul>
+        ${findings.length > 0
+          ? findings.map(f => `<li>${f}</li>`).join('')
+          : '<li>No critical issues identified. PM program is operating within acceptable parameters.</li>'
+        }
+      </ul>
+    </div>
+    <div class="findings-box" style="background:#f0fff4;border:1px solid #b7f5c9;">
+      <h4 style="color:#006400">✔ Recommended Actions</h4>
+      <ul>
+        ${actions.length > 0
+          ? actions.map(a => `<li>${a}</li>`).join('')
+          : '<li>Continue current maintenance schedule. Monitor interval ratios quarterly.</li>'
+        }
+      </ul>
+    </div>
+  </div>
+
+  <!-- ══ 3. OPERATING PARAMETERS ════════════════════════════════ -->
+  <div class="section-title">3. Operating Parameters</div>
   <div class="params-grid">
     <div>
       <div class="param-row"><span class="pk">Compressor Unit</span><span class="pv">${results.unit_label || '—'}</span></div>
-      <div class="param-row"><span class="pk">Start Date</span><span class="pv">${results.start_date || '—'}</span></div>
+      <div class="param-row"><span class="pk">Start / Commissioning Date</span><span class="pv">${results.start_date || '—'}</span></div>
       <div class="param-row"><span class="pk">Total Operating Hours</span><span class="pv">${results.total_hours?.toLocaleString() || '—'} hrs</span></div>
       <div class="param-row"><span class="pk">Compression Stages</span><span class="pv">${stages}</span></div>
     </div>
     <div>
       <div class="param-row"><span class="pk">Work Order File</span><span class="pv">${results.wo_filename || '—'}</span></div>
-      <div class="param-row"><span class="pk">WO Rows Matched</span><span class="pv">${results.matched_rows ?? '—'} of ${results.wo_rows ?? '—'}</span></div>
-      ${results.analysis_id ? `<div class="param-row"><span class="pk">Analysis ID</span><span class="pv" style="font-family:monospace;font-size:9px">${results.analysis_id}</span></div>` : ''}
+      <div class="param-row"><span class="pk">Total WO Rows in File</span><span class="pv">${results.wo_rows ?? '—'}</span></div>
+      <div class="param-row"><span class="pk">WO Rows Matched to PM Tasks</span><span class="pv">${results.matched_rows ?? '—'} (${results.wo_rows ? Math.round((results.matched_rows / results.wo_rows) * 100) : 0}% match rate)</span></div>
+      ${results.analysis_id
+        ? `<div class="param-row"><span class="pk">Analysis ID</span><span class="pv" style="font-family:monospace;font-size:9px">${results.analysis_id}</span></div>`
+        : ''}
     </div>
   </div>
 
-  <!-- Compliance Table -->
-  <div class="section-title">PM Task Compliance Results</div>
+  <!-- ══ 4. PM TASK COMPLIANCE RESULTS TABLE ════════════════════ -->
+  <div class="section-title">4. PM Task Compliance Results</div>
   <table>
     <thead>
       <tr>
@@ -541,12 +766,27 @@ function printReport({ results, stages, unit }) {
     <tbody>${taskRows}</tbody>
   </table>
 
-  <!-- Work Order Events -->
-  <div class="section-title" style="margin-top:28px">Detailed Task Analysis — Work Order Events</div>
-  ${eventSections}
+  <div style="margin-top:8px;font-size:9px;color:#64748b;line-height:1.8">
+    <b>Column guide:</b>
+    <b>Compliance %</b> = (Actual ÷ Expected) × 100. &nbsp;
+    <b>Interval Ratio</b> = Avg actual interval ÷ target interval (1.0x = perfect; &lt;1x = over-maintained; &gt;1x = under-maintained). &nbsp;
+    <b>Recency Status</b>: OK = last event within interval; Due Soon = &gt;80% of interval elapsed; Overdue = interval exceeded. &nbsp;
+    <b>Raw WOs</b> = Total SAP work orders before same-day deduplication.
+  </div>
 
+  <!-- ══ 5. DETAILED TASK-BY-TASK INTERPRETATION ════════════════ -->
+  <div class="section-title pb-before">5. Detailed Task-by-Task Interpretation</div>
+  ${interpretationRows}
+
+  <!-- ══ 6. WORK ORDER EVENT LOG ════════════════════════════════ -->
+  <div class="section-title">6. Work Order Event Log (by Task)</div>
+  ${eventSections || '<p style="color:#64748b;font-size:10px">No work order events found.</p>'}
+
+  <!-- ══ FOOTER ══════════════════════════════════════════════════ -->
   <div class="footer">
     CompressorAI v6.0 · PM Compliance Analysis Module · ${now} · Unit: ${results.unit_label || '—'}
+    <br/>This report is generated automatically based on SAP work order data and the active PM plan.
+    Findings and recommendations should be reviewed by a qualified maintenance engineer.
   </div>
 
 </div>
@@ -558,7 +798,6 @@ function printReport({ results, stages, unit }) {
   win.document.close()
   win.onload = () => win.print()
 }
-
 // ── File Drop Zone ────────────────────────────────────────────
 function DropZone({ label, accept, file, onFile, icon: Icon, hint, color = '#00d4ff' }) {
   const ref = useRef()
