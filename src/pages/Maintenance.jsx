@@ -31,7 +31,7 @@ import {
   ResponsiveContainer, Cell, ReferenceLine, Legend, LabelList
 } from 'recharts'
 import api from '../utils/api'
-
+ 
 // ── Constants ─────────────────────────────────────────────────
 const RECENCY_COLORS = {
   'OK':         { bg: 'rgba(0,200,83,0.1)',  border: 'rgba(0,200,83,0.3)',  text: '#00c853', icon: CheckCircle },
@@ -46,7 +46,7 @@ const INTERVAL_COLORS = {
   'Unknown':         '#64748b',
 }
 const COMPLIANCE_COLOR = (v) => v >= 90 ? '#00c853' : v >= 70 ? '#facc15' : '#ef4444'
-
+ 
 // ── Helper: deduplicate PM task results by task name ───────────
 // The backend can occasionally return the same PM task twice
 // (e.g. when the WO file matches a task via more than one pathway).
@@ -64,7 +64,7 @@ function dedupeResults(results) {
   }
   return out
 }
-
+ 
 // ── Tutorial Steps ────────────────────────────────────────────
 const tutorialSteps = [
   {
@@ -204,13 +204,13 @@ const tutorialSteps = [
     ),
   },
 ]
-
+ 
 // ── Tutorial Modal ────────────────────────────────────────────
 function MaintenanceTutorial({ onClose }) {
   const [current, setCurrent] = useState(0)
   const step = tutorialSteps[current]
   const Icon = step.icon
-
+ 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4"
       style={{ background: 'rgba(4,10,22,0.92)', backdropFilter: 'blur(10px)' }}
@@ -221,7 +221,7 @@ function MaintenanceTutorial({ onClose }) {
         exit={{ opacity: 0, scale: 0.92 }}
         className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl"
         style={{ background: 'rgba(8,20,40,0.98)', border: '1px solid rgba(0,212,255,0.15)', boxShadow: '0 40px 100px rgba(0,0,0,0.7)' }}>
-
+ 
         <div className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 border-b"
           style={{ background: 'rgba(8,20,40,0.98)', borderColor: 'rgba(255,255,255,0.07)' }}>
           <div className="flex items-center gap-3">
@@ -237,7 +237,7 @@ function MaintenanceTutorial({ onClose }) {
             ✕
           </button>
         </div>
-
+ 
         <div className="flex items-center gap-2 px-6 pt-4">
           {tutorialSteps.map((_, i) => (
             <button key={i} onClick={() => setCurrent(i)}
@@ -249,7 +249,7 @@ function MaintenanceTutorial({ onClose }) {
           ))}
           <span className="text-xs text-slate-600 font-mono ml-auto">{current + 1} / {tutorialSteps.length}</span>
         </div>
-
+ 
         <AnimatePresence mode="wait">
           <motion.div key={current}
             initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
@@ -269,7 +269,7 @@ function MaintenanceTutorial({ onClose }) {
             </div>
           </motion.div>
         </AnimatePresence>
-
+ 
         <div className="flex items-center justify-between px-6 py-4 border-t"
           style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
           <button onClick={() => current > 0 && setCurrent(c => c - 1)}
@@ -296,7 +296,7 @@ function MaintenanceTutorial({ onClose }) {
     </div>
   )
 }
-
+ 
 // ── Print Report (UPDATED v6.1 — with full interpretation) ────────────────
 function printReport({ results, stages, unit }) {
   if (!results) return
@@ -304,44 +304,55 @@ function printReport({ results, stages, unit }) {
   const now = new Date().toLocaleString('en-PK', {
     timeZone: 'Asia/Karachi', dateStyle: 'long', timeStyle: 'short'
   })
-
+ 
   const dedupedResults = dedupeResults(results.results)
-
+ 
   // ── Interpretation Helpers ─────────────────────────────────────────────
-
+ 
   const COMPLIANCE_STYLE = (v) =>
     v >= 90 ? 'color:#006400;font-weight:700'
     : v >= 70 ? 'color:#856404;font-weight:700'
     : 'color:#842029;font-weight:700'
-
+ 
   const RECENCY_STYLE = (r) =>
     r === 'OK' ? 'color:#006400' : r === 'Due Soon' ? 'color:#856404' : 'color:#842029'
-
+ 
   const INTERVAL_STYLE = (r) =>
     r === 'On Track' ? 'color:#006400'
     : r === 'Over-maintained' || r === 'Over' ? 'color:#0c6478'
     : r === 'Never Performed' || r === 'Under' ? 'color:#842029'
     : 'color:#842029'
-
+ 
   // ── Overall Health Assessment ──────────────────────────────────────────
   function getOverallHealth(avgCompliance, overdueCount, neverDoneCount, total) {
-    if (avgCompliance >= 90 && overdueCount === 0)
+    // Over-maintained: compliance well above 100% means tasks done far too frequently
+    if (avgCompliance > 115 && overdueCount === 0)
+      return { label: 'OVER-MAINTAINED', color: '#0c6478', bg: '#f0faff',
+        desc: 'Maintenance is being performed significantly more frequently than the PM plan requires. While equipment uptime may be high, this results in unnecessary cost and resource expenditure. Review scheduling triggers to align with planned intervals.' }
+    // Excellent: high compliance, no overdue tasks
+    if (avgCompliance >= 90 && avgCompliance <= 115 && overdueCount === 0)
       return { label: 'EXCELLENT', color: '#006400', bg: '#f0fff4',
         desc: 'PM program is well-managed. All tasks are being performed on schedule with high compliance.' }
+    // Good: generally on track with minor deviations
     if (avgCompliance >= 75 && overdueCount <= 2)
       return { label: 'GOOD', color: '#1a6b2a', bg: '#f0fff4',
         desc: 'PM program is generally on track with minor deviations. Some tasks require attention.' }
-    if (avgCompliance >= 60 || overdueCount <= Math.floor(total * 0.3))
+    // Critical: many overdue tasks regardless of compliance score
+    if (overdueCount > Math.floor(total * 0.5) || neverDoneCount > Math.floor(total * 0.3))
+      return { label: 'CRITICAL', color: '#842029', bg: '#fff5f5',
+        desc: 'PM program has significant gaps. Multiple overdue tasks and missed maintenance events indicate high equipment failure risk. Immediate corrective action required.' }
+    // Needs attention: moderate issues (fixed: was || which incorrectly caught over-maintained cases)
+    if (avgCompliance >= 60 && overdueCount <= Math.floor(total * 0.5))
       return { label: 'NEEDS ATTENTION', color: '#856404', bg: '#fffbeb',
         desc: 'Several PM tasks are overdue or not being performed at the planned frequency. Immediate review recommended.' }
     return { label: 'CRITICAL', color: '#842029', bg: '#fff5f5',
-      desc: 'PM program has significant gaps. Multiple overdue tasks and missed maintenance events indicate high equipment risk.' }
+      desc: 'PM program has significant gaps. Multiple overdue tasks and missed maintenance events indicate high equipment failure risk. Immediate corrective action required.' }
   }
-
+ 
   // ── Per-task Interpretation ────────────────────────────────────────────
   function interpretTask(row) {
     const lines = []
-
+ 
     // Compliance interpretation
     if (row.compliance_pct >= 110) {
       lines.push(`<b>Over-maintained:</b> This task was performed ${row.actual_pm} times vs ${row.expected_pm} expected — maintenance is occurring too frequently, adding unnecessary cost.`)
@@ -354,7 +365,7 @@ function printReport({ results, stages, unit }) {
     } else {
       lines.push(`<b>Never performed:</b> This task has not been recorded in the work order system despite being required every ${row.interval_hours?.toLocaleString()} hrs.`)
     }
-
+ 
     // Interval ratio interpretation
     if (row.interval_ratio !== null && row.interval_ratio !== undefined) {
       if (row.interval_ratio < 0.85) {
@@ -365,7 +376,7 @@ function printReport({ results, stages, unit }) {
         lines.push(`<b>Interval on target (${row.interval_ratio}x):</b> Average actual interval closely matches the PM plan target of ${row.interval_hours?.toLocaleString()} hrs.`)
       }
     }
-
+ 
     // Recency / overdue interpretation
     if (row.recency_status === 'Overdue') {
       lines.push(`<b>⚠ OVERDUE:</b> The last maintenance event was ${row.last_interval?.toLocaleString()} hrs ago — ${row.delay_hours?.toLocaleString()} hrs past the required interval of ${row.interval_hours?.toLocaleString()} hrs. Immediate action required.`)
@@ -374,57 +385,57 @@ function printReport({ results, stages, unit }) {
     } else if (row.recency_status === 'OK') {
       lines.push(`<b>Recency OK:</b> Last performed ${row.last_interval?.toLocaleString()} hrs ago — within the safe window of ${row.interval_hours?.toLocaleString()} hrs.`)
     }
-
+ 
     // Cost interpretation
     if (row.over_maintenance > 0 && row.over_maint_cost > 0) {
       lines.push(`<b>Over-maintenance cost:</b> PKR ${row.over_maint_cost?.toLocaleString()} was spent on ${row.over_maintenance} unnecessary maintenance event(s) beyond what the PM plan requires.`)
     }
-
+ 
     return lines.map(l => `<li style="margin-bottom:4px">${l}</li>`).join('')
   }
-
+ 
   // ── Key Findings & Recommendations ────────────────────────────────────
   function buildFindings(results, summary) {
     const findings = []
     const actions  = []
-
+ 
     const overdue       = results.filter(r => r.recency_status === 'Overdue')
     const neverDone     = results.filter(r => r.actual_pm === 0)
     const overMaint     = results.filter(r => r.interval_status === 'Over' || r.interval_status === 'Over-maintained')
     const underMaint    = results.filter(r => r.interval_status === 'Under' || r.interval_status === 'Under-maintained')
     const highCost      = [...results].filter(r => r.total_cost > 0).sort((a,b) => b.total_cost - a.total_cost).slice(0, 3)
-
+ 
     if (overdue.length > 0) {
       findings.push(`<b>${overdue.length} task(s) are currently OVERDUE</b> — ${overdue.map(r => `"${r.task}" (+${r.delay_hours?.toLocaleString()} hrs past due)`).join('; ')}.`)
       actions.push(`Immediately schedule and execute the following overdue tasks: <b>${overdue.map(r => r.task).join(', ')}</b>. Each additional hour of delay increases equipment wear and failure risk.`)
     }
-
+ 
     if (neverDone.length > 0) {
       findings.push(`<b>${neverDone.length} task(s) have NEVER been recorded</b> in the work order system: ${neverDone.map(r => `"${r.task}"`).join(', ')}.`)
       actions.push(`Verify whether "${neverDone.map(r => r.task).join('", "')}" have been performed manually without SAP logging, or if they have been genuinely omitted. If omitted, schedule immediately.`)
     }
-
+ 
     if (overMaint.length > 0) {
       findings.push(`<b>${overMaint.length} task(s) are being over-maintained</b> (performed more frequently than required): ${overMaint.map(r => `"${r.task}" at ${r.interval_ratio}x frequency`).join('; ')}.`)
       actions.push(`Review scheduling triggers for over-maintained tasks. Aligning to PM plan intervals could save an estimated <b>PKR ${summary.over_maint_cost?.toLocaleString()}</b> per cycle.`)
     }
-
+ 
     if (underMaint.length > 0) {
       findings.push(`<b>${underMaint.length} task(s) are under-maintained</b> (performed less frequently than required): ${underMaint.map(r => `"${r.task}" at ${r.interval_ratio}x`).join('; ')}.`)
       actions.push(`Increase maintenance frequency for under-maintained tasks to meet PM plan requirements and prevent premature equipment failure.`)
     }
-
+ 
     if (summary.avg_compliance_pct > 100) {
       findings.push(`<b>Overall compliance of ${summary.avg_compliance_pct}% exceeds 100%</b> — the fleet is being maintained more aggressively than the PM plan specifies, resulting in higher costs without proportional reliability benefit.`)
     }
-
+ 
     if (highCost.length > 0) {
       findings.push(`<b>Top cost-generating tasks:</b> ${highCost.map(r => `"${r.task}" (PKR ${r.total_cost?.toLocaleString()})`).join('; ')}.`)
     }
-
+ 
     return { findings, actions }
   }
-
+ 
   // ── Build HTML ─────────────────────────────────────────────────────────
   const health = getOverallHealth(
     s.avg_compliance_pct,
@@ -432,9 +443,9 @@ function printReport({ results, stages, unit }) {
     s.tasks_never_done,
     s.total_tasks
   )
-
+ 
   const { findings, actions } = buildFindings(dedupedResults, s)
-
+ 
   const taskRows = dedupedResults.map(row => `
     <tr>
       <td>${row.task}<br/><small style="color:#666">Every ${row.interval_hours?.toLocaleString()} hrs</small></td>
@@ -453,7 +464,7 @@ function printReport({ results, stages, unit }) {
       <td style="text-align:center">${row.total_cost > 0 ? 'PKR ' + row.total_cost?.toLocaleString() : '—'}</td>
     </tr>
   `).join('')
-
+ 
   const interpretationRows = dedupedResults.map(row => `
     <div class="interp-block">
       <div class="interp-header">
@@ -466,7 +477,7 @@ function printReport({ results, stages, unit }) {
       <ul class="interp-list">${interpretTask(row)}</ul>
     </div>
   `).join('')
-
+ 
   const eventSections = dedupedResults.map(row => {
     if (!row.events?.length) return ''
     const evRows = row.events.map(ev => `
@@ -495,7 +506,7 @@ function printReport({ results, stages, unit }) {
       </div>
     `
   }).join('')
-
+ 
   const html = `<!DOCTYPE html>
 <html>
 <head>
@@ -504,7 +515,7 @@ function printReport({ results, stages, unit }) {
   <style>
     * { box-sizing:border-box; margin:0; padding:0; }
     body { font-family:'Segoe UI',Arial,sans-serif; font-size:11px; color:#1a1a2e; background:#fff; }
-
+ 
     /* ── Cover ── */
     .cover {
       background:linear-gradient(135deg,#0a1628 0%,#0d2040 100%);
@@ -517,7 +528,7 @@ function printReport({ results, stages, unit }) {
     .cover-right { text-align:right; }
     .cover-right .unit { font-size:20px; font-weight:700; color:#facc15; }
     .cover-right .meta { color:#64748b; font-size:10px; margin-top:4px; line-height:1.6; }
-
+ 
     /* ── Section headers ── */
     .section-title {
       font-size:12px; font-weight:700; text-transform:uppercase;
@@ -525,7 +536,7 @@ function printReport({ results, stages, unit }) {
       border-bottom:2px solid #0a1628; padding-bottom:5px;
       margin:28px 0 14px;
     }
-
+ 
     /* ── Overall Health Banner ── */
     .health-banner {
       border-radius:8px; padding:16px 20px; margin-bottom:20px;
@@ -536,7 +547,7 @@ function printReport({ results, stages, unit }) {
       white-space:nowrap; padding-top:2px;
     }
     .health-desc { font-size:11px; line-height:1.7; }
-
+ 
     /* ── KPI Strip ── */
     .kpi-strip {
       display:grid; grid-template-columns:repeat(6,1fr);
@@ -547,14 +558,14 @@ function printReport({ results, stages, unit }) {
     .kpi:last-child { border-right:none; }
     .kpi .val { font-size:22px; font-weight:800; }
     .kpi .lbl { font-size:9px; text-transform:uppercase; letter-spacing:0.5px; color:#64748b; margin-top:3px; }
-
+ 
     /* ── Alert box ── */
     .alert-box {
       border:1px solid #f5c2c7; background:#fff5f5;
       border-radius:6px; padding:10px 14px; margin-bottom:20px;
       font-size:11px; color:#842029;
     }
-
+ 
     /* ── Findings ── */
     .findings-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px; }
     .findings-box {
@@ -563,7 +574,7 @@ function printReport({ results, stages, unit }) {
     .findings-box h4 { font-size:10px; text-transform:uppercase; letter-spacing:0.8px; margin-bottom:8px; }
     .findings-box ul { padding-left:14px; }
     .findings-box li { font-size:10px; line-height:1.7; margin-bottom:4px; color:#333; }
-
+ 
     /* ── Params ── */
     .params-grid { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-bottom:20px; }
     .param-row {
@@ -572,7 +583,7 @@ function printReport({ results, stages, unit }) {
     }
     .param-row .pk { color:#555; }
     .param-row .pv { font-weight:600; color:#0a1628; }
-
+ 
     /* ── Tables ── */
     table { width:100%; border-collapse:collapse; font-size:10px; }
     th {
@@ -583,7 +594,7 @@ function printReport({ results, stages, unit }) {
     td { padding:7px 8px; border-bottom:1px solid #e8eaf0; vertical-align:top; }
     tr:nth-child(even) td { background:#f8f9fb; }
     tr:last-child td { border-bottom:none; }
-
+ 
     /* ── Per-task Interpretation ── */
     .interp-block {
       margin-bottom:14px; padding:12px 14px;
@@ -599,7 +610,7 @@ function printReport({ results, stages, unit }) {
     .interp-meta { font-size:9px; color:#64748b; font-family:monospace; }
     .interp-list { padding-left:16px; }
     .interp-list li { font-size:10px; line-height:1.7; color:#333; margin-bottom:3px; }
-
+ 
     /* ── Event blocks ── */
     .event-block { margin-bottom:18px; break-inside:avoid; }
     .event-block h4 {
@@ -607,18 +618,18 @@ function printReport({ results, stages, unit }) {
       background:#f0f4ff; padding:7px 10px;
       border-left:3px solid #00d4ff; margin-bottom:6px;
     }
-
+ 
     /* ── Footer ── */
     .footer {
       text-align:center; font-size:9px; color:#94a3b8;
       border-top:1px solid #e8eaf0; padding:10px 0; margin-top:24px;
     }
-
+ 
     .body-wrap { padding:20px 40px; }
-
+ 
     /* ── Page break hints ── */
     .pb-before { page-break-before:always; }
-
+ 
     @media print {
       body { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
       .interp-block { break-inside:avoid; }
@@ -627,7 +638,7 @@ function printReport({ results, stages, unit }) {
   </style>
 </head>
 <body>
-
+ 
 <!-- ══ COVER ══════════════════════════════════════════════════ -->
 <div class="cover">
   <div class="cover-left">
@@ -643,12 +654,12 @@ function printReport({ results, stages, unit }) {
     </div>
   </div>
 </div>
-
+ 
 <div class="body-wrap">
-
+ 
   <!-- ══ 1. EXECUTIVE SUMMARY ══════════════════════════════════ -->
   <div class="section-title">1. Executive Summary</div>
-
+ 
   <!-- Health Banner -->
   <div class="health-banner" style="background:${health.bg};border:1.5px solid ${health.color}30;">
     <div class="health-label" style="color:${health.color}">● ${health.label}</div>
@@ -668,7 +679,7 @@ function printReport({ results, stages, unit }) {
       </span>
     </div>
   </div>
-
+ 
   <!-- KPI Strip -->
   <div class="kpi-strip">
     <div class="kpi">
@@ -696,7 +707,7 @@ function printReport({ results, stages, unit }) {
       <div class="lbl">Over-maintained</div>
     </div>
   </div>
-
+ 
   <!-- Over-maint alert -->
   ${s.over_maint_cost > 0 ? `
   <div class="alert-box">
@@ -704,7 +715,7 @@ function printReport({ results, stages, unit }) {
     — This is expenditure incurred by performing maintenance tasks more frequently than the PM plan requires.
     Aligning maintenance schedules to plan intervals would recover this cost in future cycles.
   </div>` : ''}
-
+ 
   <!-- ══ 2. KEY FINDINGS & RECOMMENDATIONS ══════════════════════ -->
   <div class="section-title">2. Key Findings &amp; Recommendations</div>
   <div class="findings-grid">
@@ -727,7 +738,7 @@ function printReport({ results, stages, unit }) {
       </ul>
     </div>
   </div>
-
+ 
   <!-- ══ 3. OPERATING PARAMETERS ════════════════════════════════ -->
   <div class="section-title">3. Operating Parameters</div>
   <div class="params-grid">
@@ -746,7 +757,7 @@ function printReport({ results, stages, unit }) {
         : ''}
     </div>
   </div>
-
+ 
   <!-- ══ 4. PM TASK COMPLIANCE RESULTS TABLE ════════════════════ -->
   <div class="section-title">4. PM Task Compliance Results</div>
   <table>
@@ -765,7 +776,7 @@ function printReport({ results, stages, unit }) {
     </thead>
     <tbody>${taskRows}</tbody>
   </table>
-
+ 
   <div style="margin-top:8px;font-size:9px;color:#64748b;line-height:1.8">
     <b>Column guide:</b>
     <b>Compliance %</b> = (Actual ÷ Expected) × 100. &nbsp;
@@ -773,26 +784,26 @@ function printReport({ results, stages, unit }) {
     <b>Recency Status</b>: OK = last event within interval; Due Soon = &gt;80% of interval elapsed; Overdue = interval exceeded. &nbsp;
     <b>Raw WOs</b> = Total SAP work orders before same-day deduplication.
   </div>
-
+ 
   <!-- ══ 5. DETAILED TASK-BY-TASK INTERPRETATION ════════════════ -->
   <div class="section-title pb-before">5. Detailed Task-by-Task Interpretation</div>
   ${interpretationRows}
-
+ 
   <!-- ══ 6. WORK ORDER EVENT LOG ════════════════════════════════ -->
   <div class="section-title">6. Work Order Event Log (by Task)</div>
   ${eventSections || '<p style="color:#64748b;font-size:10px">No work order events found.</p>'}
-
+ 
   <!-- ══ FOOTER ══════════════════════════════════════════════════ -->
   <div class="footer">
     CompressorAI v6.0 · PM Compliance Analysis Module · ${now} · Unit: ${results.unit_label || '—'}
     <br/>This report is generated automatically based on SAP work order data and the active PM plan.
     Findings and recommendations should be reviewed by a qualified maintenance engineer.
   </div>
-
+ 
 </div>
 </body>
 </html>`
-
+ 
   const win = window.open('', '_blank')
   win.document.write(html)
   win.document.close()
@@ -802,7 +813,7 @@ function printReport({ results, stages, unit }) {
 function DropZone({ label, accept, file, onFile, icon: Icon, hint, color = '#00d4ff' }) {
   const ref = useRef()
   const [drag, setDrag] = useState(false)
-
+ 
   const handleDrop = (e) => {
     e.preventDefault(); setDrag(false)
     const f = e.dataTransfer.files[0]
@@ -836,7 +847,7 @@ function DropZone({ label, accept, file, onFile, icon: Icon, hint, color = '#00d
     </div>
   )
 }
-
+ 
 // ── Status Badge ──────────────────────────────────────────────
 function StatusBadge({ status, type = 'recency' }) {
   const map = type === 'recency' ? RECENCY_COLORS : {}
@@ -849,13 +860,13 @@ function StatusBadge({ status, type = 'recency' }) {
     </span>
   )
 }
-
+ 
 // ── Compliance Row ────────────────────────────────────────────
 function ComplianceRow({ row, i }) {
   const [open, setOpen] = useState(false)
   const bar = Math.min(100, row.compliance_pct)
   const intColor = INTERVAL_COLORS[row.interval_status] || '#64748b'
-
+ 
   return (
     <>
       <tr className="border-b transition-colors hover:bg-white/[0.02] cursor-pointer"
@@ -905,7 +916,7 @@ function ComplianceRow({ row, i }) {
           {open ? <ChevronUp size={14} className="text-slate-500 mx-auto" /> : <ChevronDown size={14} className="text-slate-500 mx-auto" />}
         </td>
       </tr>
-
+ 
       {open && row.events?.length > 0 && (
         <tr style={{ background: 'rgba(0,0,0,0.15)' }}>
           <td colSpan={10} className="px-8 py-4">
@@ -933,7 +944,7 @@ function ComplianceRow({ row, i }) {
     </>
   )
 }
-
+ 
 // ── Summary KPI Card ──────────────────────────────────────────
 function KpiCard({ label, value, sub, color = '#00d4ff', icon: Icon }) {
   return (
@@ -947,7 +958,7 @@ function KpiCard({ label, value, sub, color = '#00d4ff', icon: Icon }) {
     </div>
   )
 }
-
+ 
 // ── Custom Y-Axis Tick (full label, no truncation) ────────────
 const FullYAxisTick = ({ x, y, payload }) => {
   const words = payload.value.split(' ')
@@ -959,7 +970,7 @@ const FullYAxisTick = ({ x, y, payload }) => {
     else line = test
   })
   if (line) lines.push(line)
-
+ 
   return (
     <g transform={`translate(${x},${y})`}>
       {lines.map((l, i) => (
@@ -971,13 +982,13 @@ const FullYAxisTick = ({ x, y, payload }) => {
     </g>
   )
 }
-
+ 
 // ── Chart: Planned vs Actual ──────────────────────────────────
 function IntervalChart({ data }) {
   const rowH   = 52
   const height = Math.max(300, data.length * rowH + 60)
   const yWidth = 200
-
+ 
   return (
     <ResponsiveContainer width="100%" height={height}>
       <BarChart data={data} layout="vertical"
@@ -1013,14 +1024,14 @@ function IntervalChart({ data }) {
     </ResponsiveContainer>
   )
 }
-
+ 
 // ── Chart: Compliance % ───────────────────────────────────────
 function ComplianceChart({ data }) {
   const rowH   = 52
   const height = Math.max(300, data.length * rowH + 60)
   const yWidth = 200
   const maxDomain = Math.max(150, ...data.map(d => d.compliance || 0)) + 20
-
+ 
   return (
     <ResponsiveContainer width="100%" height={height}>
       <BarChart data={data} layout="vertical"
@@ -1065,12 +1076,12 @@ function ComplianceChart({ data }) {
     </ResponsiveContainer>
   )
 }
-
+ 
 // ── Main Component ────────────────────────────────────────────
 export default function Maintenance() {
   const navigate = useNavigate()
   const location = useLocation()
-
+ 
   const [showTutorial, setShowTutorial] = useState(false)
   const [step, setStep]                 = useState(1)
   const [units, setUnits]               = useState([])
@@ -1086,7 +1097,7 @@ export default function Maintenance() {
   const [loading, setLoading]           = useState(false)
   const [results, setResults]           = useState(null)
   const [history, setHistory]           = useState([])
-
+ 
   useEffect(() => {
     const navState = location.state
     if (navState?.preselectedUnit) {
@@ -1109,7 +1120,7 @@ export default function Maintenance() {
       })
       .catch(() => {})
   }, []) // eslint-disable-line
-
+ 
   useEffect(() => {
     if (!selectedUnit) { setActivePlan(null); return }
     setPlanLoading(true)
@@ -1121,7 +1132,7 @@ export default function Maintenance() {
       .then(r => setHistory(r.data || []))
       .catch(() => setHistory([]))
   }, [selectedUnit])
-
+ 
   const handleNumYears = (n) => {
     const clamped = Math.max(1, Math.min(20, n))
     setNumYears(clamped)
@@ -1131,7 +1142,7 @@ export default function Maintenance() {
       return arr.slice(0, clamped)
     })
   }
-
+ 
   const handleUploadPM = async () => {
     if (!pmFile || !selectedUnit) return
     const fd = new FormData()
@@ -1145,14 +1156,14 @@ export default function Maintenance() {
       toast.error(err.response?.data?.detail || 'PM plan upload failed')
     }
   }
-
+ 
   const handleAnalyze = async () => {
     if (!woFile)                 { toast.error('Upload a Work Order file first'); return }
     if (!selectedUnit)           { toast.error('Select a compressor unit'); return }
     if (!activePlan)             { toast.error('Upload a PM Plan first'); return }
     if (yearlyHours.some(h => !h || h <= 0)) { toast.error('All yearly hours must be > 0'); return }
     if (!stages || stages < 1)   { toast.error('Stages must be at least 1'); return }
-
+ 
     setLoading(true); setResults(null)
     try {
       const fd = new FormData()
@@ -1170,19 +1181,19 @@ export default function Maintenance() {
       setLoading(false)
     }
   }
-
+ 
   const loadHistoryItem = async (id) => {
     try {
       const r = await api.get(`/maintenance/analysis/${id}`)
       setResults(r.data); setStep(3)
     } catch { toast.error('Failed to load analysis') }
   }
-
+ 
   // De-duplicated PM task results — used for the table, charts,
   // and the on-screen results view. Backend can sometimes return
   // the same PM task twice; keep the first occurrence only.
   const dedupedResults = dedupeResults(results?.results)
-
+ 
   // Chart data — use fullName (no truncation) for Y-axis
   const chartData = dedupedResults.map(r => ({
     name:       r.task.length > 28 ? r.task.slice(0, 26) + '…' : r.task,
@@ -1192,14 +1203,14 @@ export default function Maintenance() {
     compliance: r.compliance_pct,
     overCost:   r.over_maint_cost,
   }))
-
+ 
   const s = results?.summary || {}
-
+ 
   return (
     <div className="space-y-6 page-enter">
-
+ 
       {showTutorial && <MaintenanceTutorial onClose={() => setShowTutorial(false)} />}
-
+ 
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
@@ -1235,7 +1246,7 @@ export default function Maintenance() {
           )}
         </div>
       </div>
-
+ 
       {/* Step Indicator */}
       <div className="flex items-center gap-3">
         {[
@@ -1261,7 +1272,7 @@ export default function Maintenance() {
           </div>
         ))}
       </div>
-
+ 
       {/* ── STEP 1 — SETUP ── */}
       {step === 1 && (
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-5">
@@ -1287,7 +1298,7 @@ export default function Maintenance() {
                 </div>
             }
           </div>
-
+ 
           {selectedUnit && (
             <>
               <div className="card">
@@ -1295,7 +1306,7 @@ export default function Maintenance() {
                   <FileSpreadsheet size={16} className="text-yellow-400" /> PM Plan
                 </h2>
                 <p className="text-slate-500 text-xs mb-4">Upload Excel with columns: Machine, Task/Description, Frequency (e.g. "700 Hours")</p>
-
+ 
                 {activePlan && (
                   <div className="rounded-xl p-3 mb-4 flex items-center gap-3"
                     style={{ background: 'rgba(0,200,83,0.06)', border: '1px solid rgba(0,200,83,0.2)' }}>
@@ -1308,7 +1319,7 @@ export default function Maintenance() {
                       onClick={() => setPmFile(null)}>replace</span>
                   </div>
                 )}
-
+ 
                 <DropZone
                   label={activePlan ? "Upload new PM Plan" : "Drop PM Plan Excel here"}
                   accept=".xlsx,.xls,.csv"
@@ -1318,7 +1329,7 @@ export default function Maintenance() {
                   hint="Excel with Task & Frequency columns"
                   color="#facc15"
                 />
-
+ 
                 {pmFile && (
                   <button onClick={handleUploadPM}
                     className="mt-3 w-full btn-primary py-2.5 text-sm flex items-center justify-center gap-2">
@@ -1326,7 +1337,7 @@ export default function Maintenance() {
                   </button>
                 )}
               </div>
-
+ 
               {activePlan && (
                 <button onClick={() => setStep(2)} className="w-full btn-cyan py-3 font-display font-700 flex items-center justify-center gap-2">
                   Continue to Configure <ArrowRight size={16} />
@@ -1334,7 +1345,7 @@ export default function Maintenance() {
               )}
             </>
           )}
-
+ 
           {selectedUnit && history.length > 0 && (
             <div className="card">
               <h3 className="font-display font-600 text-white text-sm mb-3 flex items-center gap-2">
@@ -1365,7 +1376,7 @@ export default function Maintenance() {
           )}
         </motion.div>
       )}
-
+ 
       {/* ── STEP 2 — CONFIGURE ── */}
       {step === 2 && (
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-5">
@@ -1385,12 +1396,12 @@ export default function Maintenance() {
                 color="#00d4ff"
               />
             </div>
-
+ 
             <div className="card space-y-4">
               <h2 className="font-display font-700 text-white text-lg flex items-center gap-2">
                 <Settings size={16} className="text-yellow-400" /> Operating Parameters
               </h2>
-
+ 
               <div>
                 <label className="label">
                   Compressor Start / Commissioning Date
@@ -1403,7 +1414,7 @@ export default function Maintenance() {
                 </div>
                 <p className="text-xs text-slate-600 mt-1">Leave blank → auto-detected as earliest date in your WO file</p>
               </div>
-
+ 
               <div>
                 <label className="label">Number of Compression Stages</label>
                 <div className="flex items-center gap-3">
@@ -1422,7 +1433,7 @@ export default function Maintenance() {
                 </div>
                 <p className="text-xs text-slate-600 mt-1">Most industrial Rotary Screw Compressors = 2 stages</p>
               </div>
-
+ 
               <div>
                 <label className="label">Number of Operating Years</label>
                 <div className="flex items-center gap-3">
@@ -1440,7 +1451,7 @@ export default function Maintenance() {
                   <span className="text-slate-500 text-sm">years of operation</span>
                 </div>
               </div>
-
+ 
               <div>
                 <label className="label">Annual Running Hours per Year</label>
                 <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
@@ -1471,7 +1482,7 @@ export default function Maintenance() {
               </div>
             </div>
           </div>
-
+ 
           <div className="flex gap-3">
             <button onClick={() => setStep(1)} className="btn-ghost py-3 px-6 text-sm">← Back</button>
             <button onClick={handleAnalyze} disabled={loading || !woFile}
@@ -1482,7 +1493,7 @@ export default function Maintenance() {
               }
             </button>
           </div>
-
+ 
           <div className="rounded-xl p-4 flex items-start gap-3"
             style={{ background: 'rgba(0,212,255,0.04)', border: '1px solid rgba(0,212,255,0.1)' }}>
             <Info size={14} className="text-cyan-400 flex-shrink-0 mt-0.5" />
@@ -1494,11 +1505,11 @@ export default function Maintenance() {
           </div>
         </motion.div>
       )}
-
+ 
       {/* ── STEP 3 — RESULTS ── */}
       {step === 3 && results && (
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
-
+ 
           {/* KPIs */}
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
             <KpiCard label="Avg Compliance"   value={`${s.avg_compliance_pct}%`}                    color={COMPLIANCE_COLOR(s.avg_compliance_pct)} icon={Gauge} />
@@ -1508,7 +1519,7 @@ export default function Maintenance() {
             <KpiCard label="Due Soon"         value={s.due_soon_count}                                color="#facc15"  icon={AlertTriangle} />
             <KpiCard label="Over-maintained"  value={s.over_maint_count}                              color="#00d4ff"  icon={TrendingDown} />
           </div>
-
+ 
           {s.over_maint_cost > 0 && (
             <div className="rounded-xl p-4 flex items-center gap-3"
               style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)' }}>
@@ -1520,7 +1531,7 @@ export default function Maintenance() {
               </div>
             </div>
           )}
-
+ 
           {/* ── Charts — full width, stacked, proper height ── */}
           <div className="card">
             <h3 className="font-display font-700 text-white mb-1 flex items-center gap-2">
@@ -1531,7 +1542,7 @@ export default function Maintenance() {
             </p>
             <IntervalChart data={chartData} />
           </div>
-
+ 
           <div className="card">
             <h3 className="font-display font-700 text-white mb-1 flex items-center gap-2">
               <CheckCircle size={15} className="text-green-400" /> Compliance % per Task
@@ -1541,7 +1552,7 @@ export default function Maintenance() {
             </p>
             <ComplianceChart data={chartData} />
           </div>
-
+ 
           {/* Compliance Table */}
           <div className="card p-0 overflow-hidden">
             <div className="px-5 py-4 border-b flex items-center justify-between"
@@ -1555,7 +1566,7 @@ export default function Maintenance() {
                 <span>{results.wo_rows} total WO rows</span>
               </div>
             </div>
-
+ 
             <div className="overflow-x-auto">
               <table className="w-full" style={{ minWidth: '900px' }}>
                 <thead>
@@ -1575,7 +1586,7 @@ export default function Maintenance() {
               </table>
             </div>
           </div>
-
+ 
           {/* Meta */}
           <div className="rounded-xl p-4 flex flex-wrap gap-6 text-xs font-mono"
             style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
@@ -1588,7 +1599,7 @@ export default function Maintenance() {
               <span className="text-slate-500">Analysis ID: <span className="text-slate-600">{results.analysis_id?.slice(0, 8)}…</span></span>
             )}
           </div>
-
+ 
           <button onClick={() => { setStep(1); setResults(null); setWoFile(null) }}
             className="flex items-center gap-2 btn-ghost py-2.5 text-sm">
             <RefreshCw size={14} /> Run New Analysis
