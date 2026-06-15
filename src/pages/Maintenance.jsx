@@ -12,6 +12,9 @@
  *  - FIXED: Charts — full Y-axis labels, no truncation, proper height
  *  - FIXED: Compliance chart ReferenceLine label no longer appears mid-graph
  *  - ADDED: Print / Download Report button (well-formatted HTML print)
+ *  - FIXED: Print report & on-screen results — deduplicate PM tasks
+ *    (by task name) so the compliance table, charts and work-order
+ *    event sections don't repeat
  */
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
@@ -43,6 +46,24 @@ const INTERVAL_COLORS = {
   'Unknown':         '#64748b',
 }
 const COMPLIANCE_COLOR = (v) => v >= 90 ? '#00c853' : v >= 70 ? '#facc15' : '#ef4444'
+
+// ── Helper: deduplicate PM task results by task name ───────────
+// The backend can occasionally return the same PM task twice
+// (e.g. when the WO file matches a task via more than one pathway).
+// For display & printing we only want each task once — keep the
+// first occurrence (which carries the aggregated data).
+function dedupeResults(results) {
+  if (!Array.isArray(results)) return []
+  const seen = new Set()
+  const out  = []
+  for (const row of results) {
+    const key = (row.task || '').trim().toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(row)
+  }
+  return out
+}
 
 // ── Tutorial Steps ────────────────────────────────────────────
 const tutorialSteps = [
@@ -279,17 +300,13 @@ function MaintenanceTutorial({ onClose }) {
 // ── Print Report ───────────────────────────────────────────────
 function printReport({ results, stages, unit }) {
   if (!results) return
-
-  const seen = new Set()
-  const uniqueResults = (results.results || []).filter(row => {
-    const key = `${row.task}_${row.interval_hours}`
-    if (seen.has(key)) return false
-    seen.add(key)
-    return true
-  })
-
   const s = results.summary || {}
   const now = new Date().toLocaleString('en-PK', { timeZone: 'Asia/Karachi', dateStyle: 'long', timeStyle: 'short' })
+
+  // ── De-duplicate PM task rows (by task name) — prevents the
+  // compliance table and work-order event sections from
+  // repeating the same task twice in the printed report.
+  const dedupedResults = dedupeResults(results.results)
 
   const COMPLIANCE_STYLE = (v) =>
     v >= 90 ? 'color:#006400;font-weight:700' : v >= 70 ? 'color:#856404;font-weight:700' : 'color:#842029;font-weight:700'
@@ -300,7 +317,7 @@ function printReport({ results, stages, unit }) {
   const INTERVAL_STYLE = (r) =>
     r === 'On Track' ? 'color:#006400' : r === 'Over-maintained' ? 'color:#0c6478' : r === 'Never Performed' ? 'color:#842029' : 'color:#842029'
 
-  const taskRows = uniqueResults.map(row => `
+  const taskRows = dedupedResults.map(row => `
     <tr>
       <td>${row.task}<br/><small style="color:#666">Every ${row.interval_hours?.toLocaleString()} hrs</small></td>
       <td style="text-align:center;${COMPLIANCE_STYLE(row.compliance_pct)}">${row.compliance_pct}%</td>
@@ -314,7 +331,7 @@ function printReport({ results, stages, unit }) {
     </tr>
   `).join('')
 
-  const eventSections = uniqueResults.map(row => {
+  const eventSections = dedupedResults.map(row => {
     if (!row.events?.length) return ''
     const evRows = row.events.map(ev => `
       <tr>
@@ -465,7 +482,7 @@ function printReport({ results, stages, unit }) {
       <div class="lbl">Total Hours</div>
     </div>
     <div class="kpi">
-      <div class="val" style="color:#1a1a2e">${s.total_tasks ?? '—'}</div>
+      <div class="val" style="color:#1a1a2e">${dedupedResults.length || s.total_tasks || '—'}</div>
       <div class="lbl">PM Tasks</div>
     </div>
     <div class="kpi">
@@ -922,22 +939,20 @@ export default function Maintenance() {
     } catch { toast.error('Failed to load analysis') }
   }
 
+  // De-duplicated PM task results — used for the table, charts,
+  // and the on-screen results view. Backend can sometimes return
+  // the same PM task twice; keep the first occurrence only.
+  const dedupedResults = dedupeResults(results?.results)
+
   // Chart data — use fullName (no truncation) for Y-axis
-  const seenChart = new Set()
-  const uniqueChartResults = (results?.results || []).filter(r => {
-    const k = `${r.task}_${r.interval_hours}`
-    if (seenChart.has(k)) return false
-    seenChart.add(k)
-    return true
-  })
-  const chartData = uniqueChartResults.map(r => ({
+  const chartData = dedupedResults.map(r => ({
     name:       r.task.length > 28 ? r.task.slice(0, 26) + '…' : r.task,
     fullName:   r.task,
     expected:   r.interval_hours,
     actual:     r.avg_interval || 0,
     compliance: r.compliance_pct,
     overCost:   r.over_maint_cost,
-  })) || []
+  }))
 
   const s = results?.summary || {}
 
@@ -1249,7 +1264,7 @@ export default function Maintenance() {
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
             <KpiCard label="Avg Compliance"   value={`${s.avg_compliance_pct}%`}                    color={COMPLIANCE_COLOR(s.avg_compliance_pct)} icon={Gauge} />
             <KpiCard label="Total Hours"      value={s.total_hours_analyzed?.toLocaleString()}        sub="hrs analyzed" color="#00d4ff" icon={Clock} />
-            <KpiCard label="Tasks Analyzed"   value={s.total_tasks}                                   color="#facc15"  icon={CheckCircle} />
+            <KpiCard label="Tasks Analyzed"   value={dedupedResults.length || s.total_tasks}          color="#facc15"  icon={CheckCircle} />
             <KpiCard label="Overdue Tasks"    value={s.overdue_count}                                 color={s.overdue_count > 0 ? '#ef4444' : '#00c853'} icon={XCircle} />
             <KpiCard label="Due Soon"         value={s.due_soon_count}                                color="#facc15"  icon={AlertTriangle} />
             <KpiCard label="Over-maintained"  value={s.over_maint_count}                              color="#00d4ff"  icon={TrendingDown} />
@@ -1314,9 +1329,7 @@ export default function Maintenance() {
                   </tr>
                 </thead>
                 <tbody>
-                  {(results.results || []).filter((row, i, arr) =>
-                    arr.findIndex(r => r.task === row.task && r.interval_hours === row.interval_hours) === i
-                  ).map((row, i) => (
+                  {dedupedResults.map((row, i) => (
                     <ComplianceRow key={i} row={row} i={i} />
                   ))}
                 </tbody>
